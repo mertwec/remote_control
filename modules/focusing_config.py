@@ -44,7 +44,7 @@ class SettFOC(ConfigParser):
  
         
 if __name__ == '__main__':
-    path = 'settings_focus.conf'
+    path = 'settings_focus_temp.conf'
     sf=SettFOC(path)
     sf.createConfig(sf.start_valueparam)
     print(sf)  

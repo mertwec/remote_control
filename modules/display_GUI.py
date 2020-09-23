@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 
 import time
-import os
-import sys
+
 from tkinter import *
 import tkinter.ttk as ttk
-
+from tkinter import messagebox
 
 from configparser import ConfigParser
 
 from modbus485_mm import ModbusConnect
 from focusing_config import SettFOC
+from i2c_bus import DACModule
 
 sfoc = SettFOC()
 
-class MainWindow:
+class MainWindow(SettFOC, ModbusConnect,DACModule):
     def __init__(self,master):
         # const
         self.master=master                          # root
@@ -106,16 +106,16 @@ class MainWindow:
             # progress bar
         self.label_text_pb = Label(self.master,text=('Welding Curent,mA'),
                                 font=self.font_labels, bg=self.main_bg )
-        #self.label_value_pb = Label(self.master,text=('0000,mA'),font=self.font_labels, bg=self.main_bg )
-        self.progress_bar = ttk.Progressbar(self.master, orient="vertical",
-                                mode="determinate", length=250)
+
+        self.progress_bar = ttk.Progressbar(self.master,
+                                orient="vertical", mode="determinate", length=255, )
     
     def initUI_inform_statisic(self):
             # inform statistic
-        self.label_text_inform = Label(self.master,text=('Settings information'),
+        self.label_text_inform = Label(self.master,text=('Information'),
                                 font=self.font_labels, bg=self.main_bg )
         self.text_inform = Label(self.master,
-                                text= (f''' text\n text\n text'''),
+                                text= (f''' Torsion Plus '''),
                                 font=('Inconsolata',14), bg='black',fg='white',
                                 height= 3, width=63,
                                 anchor=W)
@@ -125,22 +125,22 @@ class MainWindow:
             # indcators
         self.label_indicator_AW = Label(self.master, text=('Aceleration Voltage'),
                             font=self.font_labels, bg=self.main_bg)
-        self.fild_indcator_AW = Canvas(bg=self.main_bg, width=70, height=50)
-        self.indicator_AW = self.fild_indcator_AW.create_oval(20,10,50,40,outline="black",
-                                width=1, fill="red")
+        self.fild_indicator_AW = Canvas(bg=self.main_bg, width=70, height=50)
+        self.indicator_AW = self.fild_indicator_AW.create_oval(20,10,50,40,outline="black",
+                                width=1, fill="white")
 
         self.label_indicator_CH = Label(self.master, text=('Cathode Heating'),
                             font=self.font_labels, bg=self.main_bg)
-        self.fild_indcator_CH = Canvas(bg=self.main_bg, width=70, height=50)
-        self.indicator_CH = self.fild_indcator_CH.create_oval(20,10,50,40,outline="black",
-                                width=1, fill="red")
+        self.fild_indicator_CH = Canvas(bg=self.main_bg, width=70, height=50)
+        self.indicator_CH = self.fild_indicator_CH.create_oval(20,10,50,40,outline="black",
+                                width=1, fill="white")
 
         self.label_indicator_WC = Label(self.master, text=('Welding Curent'),
                             font=self.font_labels, bg=self.main_bg)
-        self.fild_indcator_WC = Canvas(bg=self.main_bg, width=70, height=50)
-        self.indicator_WC = self.fild_indcator_WC.create_oval(20,10,50,40,outline="black",
-                                width=1, fill="red")
-
+        self.fild_indicator_WC = Canvas(bg=self.main_bg, width=70, height=50)
+        self.indicator_WC = self.fild_indicator_WC.create_oval(20,10,50,40,outline="black",
+                                width=1, fill="white")
+        
                 #indicator  error
         self.label_error = Label(self.master, text=('Error'),
                             font=self.font_labels, bg=self.main_bg)
@@ -151,12 +151,12 @@ class MainWindow:
         self.indicator_error =  Label(self.master, text=('ERR: 00'),height=1, width=7,
                             font='LED 18', bg='green')
     
-    def initUI_button(self,):
-                #button
-            self.button_quit = Button(self.master,text='quit',width=10,height=1,
-                                command=lambda:self.disconnect(self.master))
-            self.button_focus = Button(self.master,text='set focus',width=10,height=1,
-                                command=lambda:open_setFocWindows())
+    def initUI_button(self):
+            #button
+        self.button_quit = Button(self.master,text='quit',width=10,height=1,
+                            command=lambda:self.disconnect(self.master))
+        self.button_focus = Button(self.master,text='set focus',width=10,height=1,
+                            command=lambda:open_setFocWindows())
 
     # widget layout
     def mGrid(self):
@@ -207,32 +207,55 @@ class MainWindow:
         self.indicator_error.grid(row=10, column=0, sticky=N, padx=7, pady=3)
 
         self.label_indicator_AW.grid(row=9, column=1,sticky=N, padx=7, pady=3)
-        self.fild_indcator_AW.grid(row=10, column=1,padx=7, pady=1)
+        self.fild_indicator_AW.grid(row=10, column=1,padx=7, pady=1)
 
         self.label_indicator_CH.grid(row=9, column=2,sticky=N, padx=7, pady=3)
-        self.fild_indcator_CH.grid(row=10, column=2,padx=7, pady=1)
+        self.fild_indicator_CH.grid(row=10, column=2,padx=7, pady=1)
 
         self.label_indicator_WC.grid(row=9, column=3,sticky=N, padx=7, pady=3)
-        self.fild_indcator_WC.grid(row=10, column=3, padx=7, pady=1)
+        self.fild_indicator_WC.grid(row=10, column=3, padx=7, pady=1)
 
+    '''help function'''
+    def change_label(self, label, valueparam,):
+        label.config(text=str(valueparam))	
+        label.after(300, self.change_label,label,valueparam)
+    
+    def change_label_err(self, label, valueparam):
+        if valueparam !=0:
+            label.config(text=f'ERR: {valueparam}',bg = 'red')
+        label.after(300, self.change_label,label,valueparam)
+        
+    def change_indicator(self, canvas, status):
+        if status:
+            canvas.create_oval(20,10,50,40,outline="black",
+                                width=1, fill="red")
+        canvas.after(400, self.change_indicator, canvas, status)
+        
+    def change_progressbar(self, prbar, value_):
+        prbar['value'] = value_
+        prbar["maximum"]=255
+        prbar.after(400,self.change_progressbar,  prbar, value_)
+    
     def disconnect(self, master):
         print('disconnect')
         time.sleep(0.5)
         master.destroy()
 
 
-class SetFocWindow(MainWindow, SettFOC, ModbusConnect):
+class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
     def __init__(self, master):
+       
         MainWindow.__init__(self, master)
-        SettFOC.__init__(self)#,path='modules\settings_focus.conf')
+        SettFOC.__init__(self)  #,path='modules\settings_focus.conf')
         ModbusConnect.__init__(self)
+        DACModule.__init__(self)
         
         self.I_FOC=self.readConfig(['I_FOC'])['I_FOC']
         self.I_BOMB_setting = self.read_one_register(123, functioncode_=3, degree_=1, signed_=False)
-        self.initUI_foc()
         
+        self.initUI_foc()        
         self.set_entry_values(self.readConfig())
-        
+  
         
 
     def initUI_foc(self):
@@ -323,16 +346,38 @@ class SetFocWindow(MainWindow, SettFOC, ModbusConnect):
         i_foc_max = self.entry_set_I_FOC_MAX.get()
         dac_min = self.entry_set_DAC_MIN.get()
         dac_max = self.entry_set_DAC_MAX.get()
-        return {'I_FOC':i_foc,
-                'I_FOC_MIN':i_foc_min,
-                'I_FOC_MAX':i_foc_max,
-                'DAC_MIN':dac_min,
-                'DAC_MAX':dac_max,}
+        return {'I_FOC':int(i_foc),
+                'I_FOC_MIN':int(i_foc_min),
+                'I_FOC_MAX':int(i_foc_max),
+                'DAC_MIN':int(dac_min),
+                'DAC_MAX':int(dac_max),}
+    
+    def show_message(self, mess):
+        messagebox.showwarning("error", mess)#, parent=Toplevel())
 
+    
     def write_from_entry_fields(self):
-
+        # read from entry 
         r_dict = self.read_entry_fields()
+        I = (r_dict['I_FOC'], r_dict['I_FOC_MIN'], r_dict['I_FOC_MAX'])
+        D = (r_dict['DAC_MIN'],r_dict['DAC_MAX'])
+        
+        for i in I:
+            if i>1000 or i<0:
+                self.show_message(f'uncorrect value {i}!')
+                return None
+        for d in D:
+            if d>255 or d<0:
+                self.show_message(f'uncorrect value dac{d}!')
+                return None
+        # запись в config file
         self.createConfig(r_dict)
+        
+        # calculate and and set DAC output
+        dac_out = self.calculateDAC(r_dict)            
+        self.write_byte_dac(self.DAC_ADDR1, dac_out)
+
+        
         self.I_FOC=self.read_entry_fields()['I_FOC']
         self.label_i_foc_current.config(text=f'current setpoint I FOCUS: {self.I_FOC}')
         print('writing to conf')
@@ -365,7 +410,11 @@ def open_setFocWindows():
     appl_foc.mGrid_foc()
 
 
-def test_main():
+if __name__ == '__main__':
+
+    sfoc = SettFOC() #'/home/pi/Desktop/pult_spreli_program/modules/settings_focus.conf')
+    connect_mb = ModbusConnect()
+
     root = Tk()
     root.geometry("940x500+50+50")      # поместить окно в точку с координатам 100,100 и установить размер в 810x450
     # root.attributes('-fullscreen', True)  #на весь экран
@@ -373,14 +422,5 @@ def test_main():
     root.configure(background = appl.main_bg)
     appl.mGrid()
     root.mainloop()
-
-
-
-if __name__ == '__main__':
-
-    sfoc = SettFOC() #'/home/pi/Desktop/pult_spreli_program/modules/settings_focus.conf')
-    connect_mb = ModbusConnect()
-
-    test_main()
 
 
