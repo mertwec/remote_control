@@ -37,10 +37,12 @@ class SettFOC(ConfigParser):
     def calculateDAC(self, parameter:dict):
         self.DAC = parameter['I_FOC']*(parameter['DAC_MAX']-parameter['DAC_MIN'])/(parameter['I_FOC_MAX']-parameter['I_FOC_MIN'])
         print(self.DAC)
-        self.config.set("Settings", 'DAC_', str(self.DAC))
-        with open(self.path, "w") as config_file:
-            self.config.write(config_file)
-        return self.DAC
+        
+        #self.config.set("Settings", 'DAC_', str(self.DAC))
+        #with open(self.path, "w") as config_file:
+        #    self.config.write(config_file)
+        
+        return int(self.DAC)
  
         
 if __name__ == '__main__':

@@ -21,32 +21,33 @@ class DACModule(MainBus):
         self.DAC_ADDR1=DEV_ADDR[0]
         self.DAC_ADDR2=DEV_ADDR[1] # not use
         self.dac_ch = 0b1000000     # 0x40
-        
+        self.set_dac_in_null()
+        '''
         self.I_FOC = 0   # tок фокусировки, диапазон от 0 до 1000мА
         self.I_FOC_MIN = 0 #диапазон от 0 до 1000мА
         self.I_FOC_MAX = 0 #диапазон от 0 до 1000мА
         self.DAC_MIN = 0   #диапазон от 0 до 255
         self.DAC_MAX = 0   # диапазон от 0 до 255
-                
+        '''
         
     def __str__(self):
         mess = f'PCF8591:/n --addres:{self.DAC_ADDR1}  and {self.DAC_ADDR2}'
         return mess
    
     def set_dac_in_null(self):
-        self.write_byte_dac(self.DAC_ADDR1,0)
-        self.write_byte_dac(self.DAC_ADDR2,0)
+        self.write_byte_dac(ADDR=self.DAC_ADDR1,byte=0)
+        self.write_byte_dac(ADDR=self.DAC_ADDR2,byte=0)
     
-    def write_byte_dac(self, byte, ADDR=0x48): 
+    def write_byte_dac(self,byte,ADDR=0x48): 
         """byte = 0 to 255 """
-        self.bus.write_byte_data(ADDR, self.dac_ch, int(byte))
-
-           
+        ADDR
+        self.bus.write_byte_data(ADDR, self.dac_ch, byte)
+    '''
     def calculateDAC(self, parameter:dict):
         self.DAC = parameter['I_FOC']*(parameter['DAC_MAX']-parameter['DAC_MIN'])/(parameter['I_FOC_MAX']-parameter['I_FOC_MIN'])
         print(self.DAC)
-        return self.DAC
-	
+        return int(self.DAC)
+	'''
 
 class ExtSwitcher(MainBus):
     _keygen = [7, 11, 13, 14, 127, 191, 223, 239, 247, 251, 253, 254]
@@ -63,7 +64,7 @@ class ExtSwitcher(MainBus):
         return f'status switcher: {self.read_switcher()}:{self.value_iweld()}'
 
     def read_exp(self, EXP_ADDR) -> int:
-        '''чтение состояния пинв expander по адресу     EXP_ADDR
+        '''чтение состояния пинв expander по адресу   EXP_ADDR
         '''           
         value = self.bus.read_byte(EXP_ADDR)        
         return value
@@ -82,7 +83,9 @@ class ExtSwitcher(MainBus):
     
     def value_iweld(self):
         return self.key_welding[self.read_switcher()]
-       
+    
+    
+    
 
 if __name__ == '__main__':
 

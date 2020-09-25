@@ -10,12 +10,14 @@ from configparser import ConfigParser
 
 from modbus485_mm import ModbusConnect
 from focusing_config import SettFOC
-from i2c_bus import DACModule
+from i2c_bus import DACModule, ExtSwitcher
 
 sfoc = SettFOC()
 
-class MainWindow(SettFOC, ModbusConnect,DACModule):
+class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
     def __init__(self,master):
+        ModbusConnect.__init__(self)
+        
         # const
         self.master=master                          # root
         self.main_bg='#9edcff'                      # задний фон поля
@@ -220,27 +222,60 @@ class MainWindow(SettFOC, ModbusConnect,DACModule):
         label.config(text=str(valueparam))	
         label.after(300, self.change_label,label,valueparam)
     
-    def change_label_err(self, label, valueparam):
-        if valueparam !=0:
-            label.config(text=f'ERR: {valueparam}',bg = 'red')
-        label.after(300, self.change_label,label,valueparam)
+    def change_information(self, label, iweld):
+        label['text']=f'TorsionPlus\nI_WELD = {iweld}'
+        label.after(300, self.change_information, label, iweld)
         
-    def change_indicator(self, canvas, status):
-        if status:
-            canvas.create_oval(20,10,50,40,outline="black",
+    def change_indicator(self, stat_system):
+        '''
+            'stat_UACC':int(mfullbss[10]), #1 reg
+            'stat_IBOMB':int(mfullbss[11]), #3 reg
+            'stat_IWELD':int(mfullbss[12]), #2 reg
+                
+                'stat_failure':int(mfullbss[13]),
+                'stat_run':int(mfullbss[8])}'''
+        stat_system = self.read_status_system()
+        if stat_system['stat_failure']==1:
+            valueparam = self.read_one_register(register_= 1, functioncode_=4) # read code of error
+            self.indicator_error.config(text=f'ERR: {valueparam}',bg = 'red')
+        else:
+            self.indicator_error.config(text=f'ERR: 00',bg = 'green')
+        
+        if stat_system['stat_UACC']:
+            self.fild_indicator_AW.create_oval(20,10,50,40,outline="black",
                                 width=1, fill="red")
-        canvas.after(400, self.change_indicator, canvas, status)
+        else:
+            self.fild_indicator_AW.create_oval(20,10,50,40,outline="black",
+                                width=1, fill="white")
         
-    def change_progressbar(self, prbar, value_):
-        prbar['value'] = value_
-        prbar["maximum"]=255
-        prbar.after(400,self.change_progressbar,  prbar, value_)
+        if stat_system['stat_IBOMB']:
+            self.fild_indicator_CH.create_oval(20,10,50,40,outline="black",
+                                width=1, fill="red")
+        else:
+            self.fild_indicator_CH.create_oval(20,10,50,40,outline="black",
+                                width=1, fill="white")
+        
+        if stat_system['stat_IWELD']:
+            self.fild_indicator_WC.create_oval(20,10,50,40,outline="black",
+                                width=1, fill="red")
+        else:
+            self.fild_indicator_WC.create_oval(20,10,50,40,outline="black",
+                                width=1, fill="white")
+        
+        self.indicator_error.after(400, self.change_indicator, stat_system)
+        
+        
+        
+    def change_progressbar(self, prbar):        # ekz_sw = ExtSwitcher()
+        iweld = ExtSwitcher().value_iweld()
+        prbar['value'] = iweld
+        prbar["maximum"] = 250
+        prbar.after(500, self.change_progressbar, prbar,)
     
     def disconnect(self, master):
         print('disconnect')
-        time.sleep(0.5)
         master.destroy()
-
+        time.sleep(0.5)
 
 class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
     def __init__(self, master):
@@ -375,7 +410,7 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
         
         # calculate and and set DAC output
         dac_out = self.calculateDAC(r_dict)            
-        self.write_byte_dac(self.DAC_ADDR1, dac_out)
+        self.write_byte_dac(byte=dac_out)
 
         
         self.I_FOC=self.read_entry_fields()['I_FOC']
@@ -408,6 +443,7 @@ def open_setFocWindows():
     appl_foc = SetFocWindow(rootf)  # all start setting in __init__        
     rootf.configure(background = appl_foc.main_bg)    
     appl_foc.mGrid_foc()
+
 
 
 if __name__ == '__main__':
