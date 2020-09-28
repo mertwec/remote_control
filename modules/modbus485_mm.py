@@ -75,7 +75,7 @@ class ModbusConnect():
         status_system = self.instrument.read_register(registeraddress=0,
                                 functioncode=4)
         bss=bin(status_system)
-        print('read stat syst:', bss)
+        #print('read stat syst:', bss)
         if len(bss[2:])<16:
             mfullbss=('0'*(16-len(bss[2:]))+bss[2:])[::-1]      
         else:
@@ -151,7 +151,31 @@ class ModbusConnect():
             total_list.append((i,value_param))
         return dict(total_list)
     
-        
+    def  read_all_parameters(self)->dict:
+        all_param = self.instrument.read_registers(registeraddress=0,
+                            number_of_registers=25, 
+                            functioncode=4)
+                            
+        return {'U_ACC':round(all_param[3]*10**(-2),2),  
+                'I_FIL':round(all_param[5]*10**(-2),2),
+                'I_BOMB':all_param[6],
+                'U_BOMB':all_param[7], 
+                'I_WELD':round(all_param[4]*10**(-1),2),
+                'U_LOCK':all_param[9],
+                'AUX':round(all_param[10]*10**-2, 2),
+                'U_WEHNELT':all_param[8],
+                'TEMP':all_param[12],
+                'U_POWER':round(all_param[11]*10**-2,2),
+                
+                'Error_current':all_param[1],
+                'Error_last':all_param[2],
+                
+                'sets_UACC':round(all_param[13]*10**(-2),2),
+                'sets_IWELD':round(all_param[14]*10**(-1),2),
+                'sets_IBOMB':round(all_param[16]*10**(-1),2),
+                }
+
+ 
     def close_connect(self):
         self.instrument.serial.close()
 
@@ -171,6 +195,8 @@ if __name__ == "__main__":
         con_.write_execution_command(register_=3, value_=1) #ibomb
         time.sleep(0.1)
         pprint(con_.read_status_system())
+        print('all  parameters: \n', )
+        pprint(con_.read_all_parameters())
     
     except Exception as e:
         print(e)        

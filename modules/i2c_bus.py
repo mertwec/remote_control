@@ -40,8 +40,8 @@ class DACModule(MainBus):
     
     def write_byte_dac(self,byte,ADDR=0x48): 
         """byte = 0 to 255 """
-        ADDR
-        self.bus.write_byte_data(ADDR, self.dac_ch, byte)
+        self.bus.write_byte_data(self.DAC_ADDR1, self.dac_ch, byte)
+        #self.bus.write_byte_data(self.DAC_ADDR2, self.dac_ch, byte)
     '''
     def calculateDAC(self, parameter:dict):
         self.DAC = parameter['I_FOC']*(parameter['DAC_MAX']-parameter['DAC_MIN'])/(parameter['I_FOC_MAX']-parameter['I_FOC_MIN'])
