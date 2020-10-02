@@ -1,10 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3.7
 
 import time
 
 from tkinter import *
 import tkinter.ttk as ttk
 from tkinter import messagebox
+from threading import Thread
 
 from configparser import ConfigParser
 
@@ -12,21 +13,26 @@ from modbus485_mm import ModbusConnect
 from focusing_config import SettFOC
 from i2c_bus import DACModule, ExtSwitcher
 
-sfoc = SettFOC()
+sfoc = SettFOC('/home/pi/Desktop/pult_spreli_program/remote_control_SPRELI/settings_focus_t.conf')
 
 class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
     def __init__(self,master):
         ModbusConnect.__init__(self)
         
         # const
-        self.master=master                          # root
-        self.main_bg='#9edcff'                      # задний фон поля
-        self.font_labels=("FreeSans", 13)           # шрифт подписей
-        self.font_displ=('DS-Digital', 33)          # шрифт на дисплейчике
-        self.width_displ=8                          # ширина диспелйчика
-        self.displ_fg='lime'                        # цвет цифер на диспл
+        self.master = master                          # root       
         
-        self.initUI()                               # виджеты
+        self.main_bg = '#9edcff'                      # задний фон поля
+        self.master.configure(background = self.main_bg)
+        
+        self.font_labels = ("FreeSans", 13)           # шрифт подписей
+        self.font_displ = ('DS-Digital', 33)          # шрифт на дисплейчике
+        self.font_displ_set = ('DS-Digital', 26)
+        self.width_displ = 8                          # ширина диспелйчика
+        self.width_displ_set = 9
+        self.displ_fg = 'lime'                        # цвет цифер на диспл
+        
+        self.initUI()                                  # виджеты
         
     def initUI(self):
         self.initUI_button()
@@ -34,16 +40,17 @@ class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
         self.initUI_inform_statisic()
         self.initUI_progress_bar()
         self.initUI_indicator()
+        self.initUI_label_sett_displ()
         
     def initUI_label_displ(self):
         self.master.title("-=SPRELI PARAMETERS=-") # основное окно
-        self.label_title = Label(self.master, text=('SPRELI PARAMETERS'),
+        self.label_title = Label(self.master, text=('-SPRELI PARAMETERS- status read'),
                                 font=self.font_labels,bg=self.main_bg)
             # labels and display
         self.label_text_U_ACC = Label(self.master,text=('Acceleration Volt,kV'),
                                 font=self.font_labels, bg=self.main_bg )
         self.label_displ_U_ACC = Label(self.master,text=('----'),anchor=E, height=1,
-                                font=self.font_displ,width=self.width_displ, justify=LEFT,
+                                font=self.font_displ, width=self.width_displ, justify=LEFT,
                                 fg=self.displ_fg, bg='black',)
 
         self.label_text_U_POW = Label(self.master,text=('Power Volt,V'),
@@ -60,7 +67,7 @@ class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
                                  fg=self.displ_fg, bg='black')
         ##############
 
-        self.label_text_U_LOCK = Label(self.master,text=('Locking Volt,V'),
+        self.label_text_U_LOCK = Label(self.master,text=('Closing Volt,V'),
                                  font=self.font_labels, bg=self.main_bg )
         self.label_displ_U_LOCK = Label(self.master,text=('----'),anchor=E,
                                  font=self.font_displ,width=self.width_displ, justify=LEFT,
@@ -89,11 +96,13 @@ class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
         self.label_displ_U_WEHNELT = Label(self.master,text=('----'),anchor=E,
                                  font=self.font_displ,width=self.width_displ, fg=self.displ_fg,
                                  bg='black')
+                                 
         self.label_text_AUX = Label(self.master,text=('AUX,V'),
                                 font=self.font_labels, bg=self.main_bg )
         self.label_displ_AUX = Label(self.master,text=('----'),anchor=E,
                                  font=self.font_displ,width=self.width_displ, fg=self.displ_fg,
                                  bg='black')
+                                 
         self.label_text_TEMP = Label(self.master,text=('Temp, C'),
                                  font=self.font_labels, bg=self.main_bg )
         self.label_displ_TEMP = Label(self.master,text=('--'),anchor=E,
@@ -104,13 +113,35 @@ class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
                                 font=self.font_displ,width=self.width_displ, fg=self.displ_fg,
                                  bg='black')
     
+    def initUI_label_sett_displ(self):
+        self.label_text_set = Label(self.master,text=('-SETTINGS-'),
+                                font=self.font_labels, bg=self.main_bg )
+                                
+        self.label_text_setUACC = Label(self.master,text=('setting UACC,kV'),
+                                 font=self.font_labels, bg=self.main_bg )
+        self.label_displ_setUACC = Label(self.master,text=('--'),anchor=E,
+                                 font=self.font_displ_set,width=self.width_displ_set, 
+                                 fg='black', bg=self.main_bg)
+        
+        self.label_text_setIBOMB = Label(self.master,text=('setting I_BOMB,mA'),
+                                 font=self.font_labels, bg=self.main_bg )
+        self.label_displ_setIBOMB = Label(self.master,text=('--'),anchor=E,
+                                 font=self.font_displ_set,width=self.width_displ_set,
+                                 fg='black', bg=self.main_bg)
+        
+        self.label_text_setIWELD = Label(self.master,text=('setting I_WELD,mA'),
+                                 font=self.font_labels, bg=self.main_bg )
+        self.label_displ_setIWELD = Label(self.master,text=('--'),anchor=E,
+                                 font=self.font_displ_set,width=self.width_displ_set, 
+                                 fg='black', bg=self.main_bg)
+                                 
     def initUI_progress_bar(self):
             # progress bar
         self.label_text_pb = Label(self.master,text=('Welding Curent,mA'),
                                 font=self.font_labels, bg=self.main_bg )
 
         self.progress_bar = ttk.Progressbar(self.master, maximum = 250,
-                                orient="vertical", mode="determinate", length=255, )
+                                orient="vertical", mode="determinate", length=230, )
     
     def initUI_inform_statisic(self):
             # inform statistic
@@ -164,8 +195,8 @@ class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
     def mGrid(self):
         self.label_title.grid(row=0,column=0,columnspan=2,sticky=W,padx=25, pady=7)
         # button
-        self.button_quit.grid(row=0,column=3, sticky=S)
-        self.button_focus.grid(row=0, column=2, sticky=S)
+        self.button_quit.grid(row=0,column=2, sticky=S)
+        self.button_focus.grid(row=0, column=3, sticky=S)
         # display
         self.label_text_U_ACC.grid(row=1, column=0,sticky=W, padx=7, pady=2)
         self.label_displ_U_ACC.grid(row=2, column=0,sticky='NW',padx=7, pady=5)
@@ -196,26 +227,40 @@ class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
 
         self.label_displ_I_WELD.grid(row=2, column=3, sticky='NW', padx=7, pady=4)
 
+        # display set labels
+        #self.label_text_set.grid(row=7, column=0, sticky=W, padx=27, pady=3)
+        
+        self.label_text_setUACC.grid(row=7, column=0, sticky='SE', padx=7, pady=2)
+        self.label_displ_setUACC.grid(row=8, column=0, sticky='NW', padx=7, pady=1)
+        
+        self.label_text_setIBOMB.grid(row=7, column=1, sticky='SE', padx=7, pady=2)
+        self.label_displ_setIBOMB.grid(row=8, column=1, sticky='NW', padx=7, pady=1)
+        
+        self.label_text_setIWELD.grid(row=7, column=2, sticky='SE', padx=7, pady=2)
+        self.label_displ_setIWELD.grid(row=8, column=2, sticky='NW', padx=7, pady=1)
+
         # progress bar
-        self.label_text_pb.grid(row=1, column=3,sticky=S, padx=7, pady=2)
-        self.progress_bar.grid(row=4,column=3,rowspan=5)
-
-        # inform statistic
-        self.label_text_inform.grid(row=7, column=0, sticky=W, padx=7, pady=3)
-        self.text_inform.grid(row=8, column=0 ,columnspan=3, sticky=W,
-                            padx=7, pady=3)
+        self.label_text_pb.grid(row=1, column=3, sticky=S, padx=7, pady=2)
+        self.progress_bar.grid(row=3,column=3, rowspan=6, pady=3)
+        
+        
+           # inform statistic
+        #self.label_text_inform.grid(row=7, column=0, sticky=W, padx=7, pady=3)
+        #self.text_inform.grid(row=8, column=0 ,columnspan=3, sticky=W,
+        #                    padx=7, pady=3)
+        
         # indicator
-        self.label_error.grid(row=9, column=0, sticky=N, padx=7, pady=3)
-        self.indicator_error.grid(row=10, column=0, sticky=N, padx=7, pady=3)
+        self.label_error.grid(row=10, column=0, sticky=N, padx=7, pady=3)
+        self.indicator_error.grid(row=9, column=0, sticky=N, padx=7, pady=3)
 
-        self.label_indicator_AW.grid(row=9, column=1,sticky=N, padx=7, pady=3)
-        self.fild_indicator_AW.grid(row=10, column=1,padx=7, pady=1)
+        self.label_indicator_AW.grid(row=10, column=1,sticky=N, padx=7, pady=3)
+        self.fild_indicator_AW.grid(row=9, column=1,padx=7, pady=1)
 
-        self.label_indicator_CH.grid(row=9, column=2,sticky=N, padx=7, pady=3)
-        self.fild_indicator_CH.grid(row=10, column=2,padx=7, pady=1)
+        self.label_indicator_CH.grid(row=10, column=2,sticky=N, padx=7, pady=3)
+        self.fild_indicator_CH.grid(row=9, column=2,padx=7, pady=1)
 
-        self.label_indicator_WC.grid(row=9, column=3,sticky=N, padx=7, pady=3)
-        self.fild_indicator_WC.grid(row=10, column=3, padx=7, pady=1)
+        self.label_indicator_WC.grid(row=10, column=3,sticky=N, padx=7, pady=3)
+        self.fild_indicator_WC.grid(row=9, column=3, padx=7, pady=1)
 
 
     #def change_label(self, label, valueparam,):
@@ -233,6 +278,9 @@ class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
         #print(stat_system)
         label.after(300, self.update_system_value, label)
         
+    def show_message(self, mess):
+        messagebox.showwarning("error", mess,)# parent=Toplevel())
+        
     def change_parameters(self, system_parameters):
         
         system_parameters = self.read_all_parameters()
@@ -247,13 +295,16 @@ class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
         self.label_displ_AUX.config(text=system_parameters['AUX'])
         self.label_displ_TEMP.config(text=system_parameters['TEMP'])
         self.label_displ_I_WELD.config(text=system_parameters['I_WELD'])
+    
+        #self.text_inform['text']=f'''TorsionPlus: I_WELD = {system_parameters["sets_IWELD"]}
+        #       I_BOMB = {system_parameters["sets_IBOMB"]}
+        #    U_ACC = {system_parameters["sets_UACC"]}'''
         
-        self.text_inform['text']=f'''TorsionPlus: I_WELD = {system_parameters["sets_IWELD"]}
-               I_BOMB = {system_parameters["sets_IBOMB"]}
-             U_ACC = {system_parameters["sets_UACC"]}'''
-             
-        self.label_title.after(300, self.change_parameters, system_parameters)
-
+        self.label_displ_setUACC.config(text=system_parameters['sets_UACC'])
+        self.label_displ_setIWELD.config(text=system_parameters['sets_IWELD'])
+        self.label_displ_setIBOMB.config(text=system_parameters['sets_IBOMB'])
+        
+        self.master.after(300, self.change_parameters, system_parameters)
             
     def change_indicator(self, stat_system):
         '''
@@ -292,7 +343,7 @@ class MainWindow(SettFOC, ModbusConnect,DACModule, ExtSwitcher):
             self.fild_indicator_WC.create_oval(20,10,50,40,outline="black",
                                 width=1, fill="white")
         
-        self.indicator_error.after(400, self.change_indicator, stat_system)
+        self.master.after(400, self.change_indicator, stat_system)
 
     def change_progressbar(self, prbar, startiweld):        # ekz_sw = ExtSwitcher()
         iweld = ExtSwitcher().value_iweld()
@@ -323,9 +374,7 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
         
         self.initUI_foc()        
         self.set_entry_values(self.readConfig())
-  
         
-
     def initUI_foc(self):
         #main title
         self.master.title("-=SETTINGS FOCUSING=-") # основное окно
@@ -333,9 +382,10 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
                                 font=self.font_labels,bg=self.main_bg)
 
         # labels
-        self.label_ibomb_current = Label(self.master, text=(f'current setpoint I BOMB: {self.I_BOMB_setting}'),
-                                font=self.font_labels,bg=self.main_bg)
-        self.label_i_foc_current = Label(self.master, text=(f'current setpoint I FOCUS: {self.I_FOC}'),font=self.font_labels,bg=self.main_bg)
+        self.label_ibomb_current = Label(self.master, text=(f'current setpoint I BOMB: {self.I_BOMB_setting},mA'),
+                                font=self.font_labels,bg=self.main_bg,width = 29, anchor=W,)
+        self.label_i_foc_current = Label(self.master, text=(f'current setpoint I FOCUS: {self.I_FOC},mA'),
+                                font=self.font_labels,bg=self.main_bg,width = 29,anchor=W,)
 
         # entry
         self.label_set_I_FOC = Label(self.master, text=(f'I FOCUS:'),
@@ -419,9 +469,6 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
                 'I_FOC_MAX':int(i_foc_max),
                 'DAC_MIN':int(dac_min),
                 'DAC_MAX':int(dac_max),}
-    
-    def show_message(self, mess):
-        messagebox.showwarning("error", mess)#, parent=Toplevel())
 
     
     def write_from_entry_fields(self):
@@ -436,7 +483,7 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
                 return None
         for d in D:
             if d>255 or d<0:
-                self.show_message(f'uncorrect value dac{d}!')
+                self.show_message(f'uncorrect value dac {d}!')
                 return None
         # запись в config file
         self.createConfig(r_dict)
@@ -445,9 +492,8 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
         dac_out = self.calculateDAC(r_dict)            
         self.write_byte_dac(byte=dac_out)
 
-        
         self.I_FOC=self.read_entry_fields()['I_FOC']
-        self.label_i_foc_current.config(text=f'current setpoint I FOCUS: {self.I_FOC}')
+        self.label_i_foc_current.config(text=f'current setpoint I FOCUS: {self.I_FOC},mA')
         print('writing to conf')
 
 
@@ -477,40 +523,87 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
                 self.createConfig(r_dict)                        
                 self.write_byte_dac(self.calculateDAC(r_dict))
                 self.label_i_foc_current.config(text=f'current setpoint I FOCUS: {r_dict["I_FOC"]}')
+
+class StartWindow(MainWindow):
+    def __init__(self, master):
+        MainWindow.__init__(self,master)
+        self.master = master
         
+        self.initUI()
+    
+    def initUI(self):
+        self.master.title("-=set=-") # основное окно
+        self.label_title = Label(self.master, text=('SPRELI PARAMETERS status: try to connect'),
+                                font=self.font_labels,bg=self.main_bg)
+        self.label_emblem = Label(self.master, text=('-TORSION PLUS-'),
+                                font=('eufm10',25),bg=self.main_bg)
 
-    def sub_i_focus():
-        '''
-        1) sub to i_focos 4mA
-        2) write i_foc to config
-        3) min 0mA
-        '''
-        pass
+    def mGrid_sw(self):
+        self.label_title.grid(row=0,column=0,padx=25, pady=7)
 
+        self.label_emblem.grid(row=3, column=0, padx=25, pady=7)
+    
+    def wait_connect(self):
+        t=200
+        self.label_title['text'] = 'SPRELI PARAMETERS status: try to connect \\'
+        time.sleep(t*0.001)
+        self.label_title['text'] = 'SPRELI PARAMETERS status: try to connect /'
+        time.sleep(t*0.001)
+        self.label_title.after(t, wait_connect,)
+    
+
+    
 def open_setFocWindows():
     '''open windows setting focusing
     '''
     rootf = Tk()
-    rootf.geometry("475x350+75+75")    
-    appl_foc = SetFocWindow(rootf)  # all start setting in __init__        
-    rootf.configure(background = appl_foc.main_bg)    
+    rootf.geometry("500x350+25+25")    
+    appl_foc = SetFocWindow(rootf)  # all start setting in __init__ 
     appl_foc.mGrid_foc()
 
+def open_mainWindow():
+    root = Tk()
+    root.geometry("800x500+25+25")      # поместить окно в точку с координатам 100,100 и установить размер в 810x450
+    #root.attributes('-fullscreen', True)  #на весь экран
+    appl = MainWindow(root)
+    appl.mGrid()
+    
+    root.mainloop()
+    
+def open_startWindow():
+    roots = Tk()
+    roots.geometry("500x350+25+25")
+    appl_sw = StartWindow(roots)
+    appl_sw.mGrid_sw()
+    
+    roots.mainloop()
+    
+def demotest():
+    s=input()
+    try:
+        if s=='q':
+            appl_sw.disconnect(roots)
+        else:
+            print(s)
+    except Exception as e:
+        print(e)
+        input()
+        
 
 
 if __name__ == '__main__':
 
-    sfoc = SettFOC() #'/home/pi/Desktop/pult_spreli_program/modules/settings_focus.conf')
     connect_mb = ModbusConnect()
-    
-    
-    
+
     root = Tk()
-    root.geometry("940x500+50+50")      # поместить окно в точку с координатам 100,100 и установить размер в 810x450
-    # root.attributes('-fullscreen', True)  #на весь экран
+    root.geometry("800x500+25+25")      # поместить окно в точку с координатам 100,100 и установить размер в 810x450
+    #root.attributes('-fullscreen', True)  #на весь экран
     appl = MainWindow(root)
-    root.configure(background = appl.main_bg)
     appl.mGrid()
+    
+    #appl_sw = StartWindow(roots)
+    #appl_sw.mGrid_sw()
+
     root.mainloop()
 
 

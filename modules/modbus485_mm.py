@@ -51,18 +51,17 @@ class ModbusConnect():
     
     def check_connect(self):
         ''' check connected (version PO -- register 33 and 34)'''
-        try:
-            check_pass1 = self.instrument.read_register(registeraddress=33,
-                                functioncode=4)
-            check_pass2 = self.instrument.read_register(registeraddress=34,
-                                functioncode=4)
-            print(f'connected: system check = {check_pass1} {check_pass2}')
-            #info_log(f'connected: system check ={check_pass1} {check_pass2}')
-            return (check_pass1,check_pass2)
-        except Exception as e:          
-            print('no conn:', e)
-            #error_log(f'Can`t connected to system: {e}')
-            return False
+        #try:
+        check_pass1 = self.instrument.read_register(registeraddress=33,
+                            functioncode=4)
+        check_pass2 = self.instrument.read_register(registeraddress=34,
+                            functioncode=4)
+        print(f'connected: system check = {check_pass1} {check_pass2}')
+        return (check_pass1,check_pass2)
+            
+        #except Exception as e:          
+            #print('no connect:', e)            
+            #return False
     
     def read_status_system(self)->dict:
         ''' 8bit = run 

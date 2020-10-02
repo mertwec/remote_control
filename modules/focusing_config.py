@@ -4,7 +4,7 @@ from configparser import ConfigParser
 
 class SettFOC(ConfigParser):
     #path = 'settings_focus.conf'
-    def __init__(self,path = 'settings_focus.conf'):
+    def __init__(self,path = '/home/pi/Desktop/pult_spreli_program/remote_control_SPRELI/settings_focus.conf'):
         self.path = path
         self.start_valueparam = {'I_FOC':0, 
                                 'I_FOC_MIN':0,
