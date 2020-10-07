@@ -6,6 +6,7 @@ import time
 from tkinter import *
 import RPi.GPIO as GPIO
 import minimalmodbus
+import asyncio
 
 sys.path.append(['/home/pi/Desktop/pult_spreli_program/remote_control_SPRELI',
                 '/home/pi/Desktop/pult_spreli_program/remote_control_SPRELI/modules'])
@@ -19,25 +20,37 @@ from modules.modbus485_mm import ModbusConnect
 from modules.focusing_config import SettFOC
 
 
-
-        
 def open_startWindow():
     roots = Tk()
     roots.geometry("500x350+25+25")
     appl_sw = StartWindow(roots)
-    roots.configure(background = appl_sw.main_bg)  
     appl_sw.mGrid_sw()
     
     roots.mainloop()
 
-def view_indicator_system(appl,parameters_:dict):
-    appl.change_indicator(parameters_)
+def view_all_display(appl, gpio, parameters_:dict):
+    appl.change_all_display(gpio, parameters_)
+
+def view_indicator_system(appl, gpio, parameters_:dict):
+    try:
+        appl.change_indicator(gpio, parameters_)
+    except Exception as e:
+        print (f'error in "view_indicator_system": {e}')
+        error_log(f'error in "view_indicator_system": {e}')
+
+        time.sleep(0.1)
+        view_indicator_system(appl, gpio, parameters_)
 
 def view_current_parameters(appl, parameters_:dict):  # param = (parameter, value)
-    appl.change_parameters(parameters_)
-
-def view_indicator_error(appl, statsyst):
-    appl.change_label_err(appl.indicator_error, statsyst)
+    try:
+        appl.change_parameters(parameters_)
+    except Exception as e:
+        print (f'error in "view_current_parameters": {e}')
+        error_log(f'error in "viev_current_parameter": {e}')
+        appl.label_title['text'] = '-SPRELI PARAMETERS- status disconnect'
+        appl.indicator_error['bg'] = 'red'
+        time.sleep(0.1)
+        view_current_parameters(appl, parameters_)
 
 def view_progressbar(appl,startiweld): 
     appl.change_progressbar(appl.progress_bar,startiweld) 
@@ -77,56 +90,52 @@ def set_start_system(appl, connect, swiweld, dac, sfoc):
     dac.write_byte_dac(byte=dac_out)        
     debug_log(f'DAC OUT = {dac_out}')
 
-
-
-def general():
-
+async def thread_gpio():
     gpio.run_system_on_signal() # listen on_uacc and on_weld
     gpio.run_system_on_knob() # listen knobs
 
-    system_parameters = connect_mb.read_all_parameters()
-    status_system = connect_mb.read_status_system()
-    start_iweld = switch.value_iweld()
+async def thread_view(application, gpio,start_iweld, system_parameters):
+    view_all_display(application, gpio, system_parameters)
+    #view_current_parameters(application, system_parameters)       
+    #view_indicator_system(application, gpio, status_system)
+    view_progressbar(application, start_iweld)
 
         
-    info_log(f'start parameters: {system_parameters}')
-    
-    print(status_system, '\n', system_parameters)
-
-    view_current_parameters(application, system_parameters)       
-    view_indicator_system(application, status_system)
-    view_progressbar(application, start_iweld)
 
 def connect_to_system(appl, connect, swiweld, dac, sfoc):
     '''init: проверка связи. конект через modbus'''
     # проверка связи с контроллером
     try:
         conn = connect.check_connect()
-        info_log(f'version:{conn}')
-        set_start_system(appl, connect, swiweld, dac, sfoc)
-        general()
+        info_log(f'version: {conn}')
         
+        set_start_system(appl, connect, swiweld, dac, sfoc)
+
+        system_parameters = connect_mb.read_all_parameters()
+        status_system = connect_mb.read_status_system()
+        start_iweld = switch.value_iweld()
+            
+        info_log(f'start parameters: {system_parameters}')    
+        print(status_system, '\n', system_parameters)
+        
+        #thread_gpio()
+        #thread_view(appl, gpio, start_iweld, system_parameters)
+        
+        async def main():
+            taskg = asyncio.create_task(thread_gpio())
+            taskv = asyncio.create_task(thread_view(appl, gpio, start_iweld, system_parameters))
+            
+            await taskg
+            await taskv
+        
+        asyncio.run(main())
+
     except Exception as e:
-        print(e)
+        print('Error in "conect to system":', e)
+        error_log(f'Error in "conect to system": {e}')
         connect_to_system(appl, connect, swiweld, dac, sfoc)
-        
-        
     
-    '''if conn:
-        info_log(f'version:{conn}')
-        set_start_system(appl, connect, swiweld, dac, sfoc)
-
-    else:
-        time.sleep(1)
-        appl.label_title['text'] = '-SPRELI PARAMETERS- status: not conection'
-        error_log('Can`t connected to system: no connect by modbus')
-        error_log('Try reconnect...')
-        # reconnect 
-        connect_to_system(appl, connect, swiweld, dac, sfoc)
-        
-        '''
-
-
+    
 if __name__ == "__main__":
     
     connect_mb = ModbusConnect()
@@ -145,23 +154,17 @@ if __name__ == "__main__":
     application = MainWindow(root)
     application.mGrid()
     
-    connect_to_system(application, connect_mb, switch, dac, sfoc)
-
-    root.mainloop()
-'''
-    except Exception as e:
-        print(f'---------------\n\n\n-----------------------')
-        #error_log(f'unknown error \n\t\t{e}')
-        #root.mainloop()
-        application.label_title['text'] = '-SPRELI PARAMETERS- status: reconection'
-        time.sleep(1)
-        
+    try:
         connect_to_system(application, connect_mb, switch, dac, sfoc)
+        info_log('start mainloop')
+        root.mainloop()
+        
+    except Exception as e:
+        print(e)
+        error_log(f'Error in __main__: {e} ')
+        application.disconnect(root)
+        connect_to_system(appl, connect, swiweld, dac, sfoc)
+        root.mainloop()
 
-    else:
-        pass
-        
-        
-'''
 
 

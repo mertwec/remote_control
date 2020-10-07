@@ -26,7 +26,6 @@ class PinIO(ModbusConnect):
         self.VD_ON_FIL = 21
         self.pins_vd = [self.VD_ON_UACC, self.VD_ON_WELD, self.VD_ON_FIL]
 
-
     def __str__(self):
         status_on_uacc = GPIO.input(self.ON_UACC)
         status_on_weld = GPIO.input(self.ON_WELD)
@@ -68,7 +67,7 @@ class PinIO(ModbusConnect):
     def fwrite_for_callback(self, register:int, value:bool):
         # helper function
         self.write_execution_command(register_=register, value_=value)
-
+        
     def callback_ON_WELD(self, chanel):
         # вызов при изменении состояния на пине ON-I_WELD
         #time.sleep(0.1)
@@ -84,33 +83,33 @@ class PinIO(ModbusConnect):
         if GPIO.input(self.ON_UACC) == 1:
             print('callback_ON_uacc  off - ',GPIO.input(self.ON_UACC))
             self.fwrite_for_callback(register=self.execution_commands['exec_I_BOMB'][0], value=False)
-            time.sleep(0.05)
+            time.sleep(0.15)
             self.fwrite_for_callback(register=self.execution_commands['exec_U_ACC'][0], value=False)
         elif GPIO.input(self.ON_UACC) == 0:
             print('callback_ON_uacc on',GPIO.input(self.ON_WELD))
             self.fwrite_for_callback(register=self.execution_commands['exec_U_ACC'][0], value=True)
-            time.sleep(0.05)
+            time.sleep(0.15)
             self.fwrite_for_callback(register=self.execution_commands['exec_I_BOMB'][0], value=True)
 
     def run_system_on_signal(self):
-
         '''    Входной сигнал ON_WELD:
             фронт из 1 в 0 – команда контроллеру на включение тока сварки,
             фронт из 0 в 1 – команда контроллеру на выключение тока сварки;
         '''
-        GPIO.add_event_detect(self.ON_WELD, GPIO.BOTH, callback=self.callback_ON_WELD, bouncetime=100)
+        GPIO.add_event_detect(self.ON_WELD, GPIO.BOTH, callback=self.callback_ON_WELD, bouncetime=500)
         print('event ON_WELD run')
 
         '''     Входной сигнал ON_UACC:
             фронт из 1 в 0 – команда контроллеру на включение источника ускоряющего напряжения, затем команда контроллеру на включение тока бомбардировки,
             фронт из 0 в 1 – команда контроллеру на выключение тока бомбардировки, затем команда контроллеру на выключение источника ускоряющего напряжения;
         '''
-        GPIO.add_event_detect(self.ON_UACC, GPIO.BOTH, callback=self.callback_ON_UACC, bouncetime=100)
+        GPIO.add_event_detect(self.ON_UACC, GPIO.BOTH, callback=self.callback_ON_UACC, bouncetime=500)
         print('event ON_UACC run')
 
     def callback_knob(self,chanel):
 
-        stat_system = self.read_status_system() #read status system
+        stat_system = self.read_status_system()  #read status system
+        
         if chanel == self.KN_UACC:
             if stat_system['stat_UACC'] == 1: # UACC - on
                 # off
