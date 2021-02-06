@@ -11,7 +11,7 @@ from mask_logging import *
 class ModbusConnect():
     def __init__(self):
         self.instrument = mm.Instrument(
-                            port='/dev/serial0', #/dev/ttyAMA0 or /dev/serial0
+                            port='/dev/serial0',    #/dev/ttyAMA0 or /dev/serial0
                             slaveaddress=1,
                             mode = mm.MODE_RTU,                            
                             close_port_after_each_call=False,
@@ -20,11 +20,12 @@ class ModbusConnect():
         self.instrument.serial.baudrate = 115200
         self.instrument.serial.timeout = 3
         
-        self.instrument.parity=serial.PARITY_NONE, # 'N'
-        self.instrument.stopbits=serial.STOPBITS_ONE,
-        self.instrument.bytesize=serial.EIGHTBITS,
-        
-        self.CURRENT_PARAMETER={'U_ACC':(3, 2),  # param:(register, degree)
+        self.instrument.parity = serial.PARITY_NONE, # 'N'
+        self.instrument.stopbits = serial.STOPBITS_ONE,
+        self.instrument.bytesize = serial.EIGHTBITS,
+       
+        #текущие параметры
+        self.CURRENT_PARAMETER={'U_ACC':(3, 2),  # param:(register, degree) 
                                 'I_FIL':(5, 2),
                                 'I_BOMB':(6, 0),
                                 'U_BOMB':(7, 0),
@@ -35,19 +36,19 @@ class ModbusConnect():
                                 'TEMP':(12, 0),
                                 'U_POWER':(11, 2),
                                 }
+        # internal setpoint parameters
+        # параметры уставки functionalcode = 3
         self.set_points = {'set_iweld':(119,1),
                             'set_uacc':(117,2),
                             'set_ibomb':(123,1)}
         
-        
-        self.register_set_i_weld = (119, 1)
-        
+            # on/off 
         self.execution_commands = {'exec_U_ACC':(1,False),  #  param:(reg,default status)
                                     'exec_I_WELD':(2,False),
                                     'exec_I_BOMB':(3,False),}
         
     def __str__(self):
-        return (f'port = {self.instrument.serial.port}, baudrate = {self.instrument.serial.baudrate}')
+        return (f'port = {self.instrument.serial.port},/nbaudrate = {self.instrument.serial.baudrate}')
     
     def check_connect(self):
         ''' check connected (version PO -- register 33 and 34)'''
@@ -55,7 +56,7 @@ class ModbusConnect():
                             functioncode=4)
         check_pass2 = self.instrument.read_register(registeraddress=34,
                             functioncode=4)
-        print(f'connected: system check = {check_pass1} {check_pass2}')
+        print(f'connected: version = {check_pass1} {check_pass2}')
         return (check_pass1,check_pass2)
     
     def parsing_status_system(self, bss:bin):
@@ -84,10 +85,11 @@ class ModbusConnect():
                                     functioncode=4)
             bss=bin(status_system)
             return self.parsing_status_system(bss)
+            
         except IOError as ioe:
             print (f'Error reading "status system": {ioe}')
             debug_log(f'Error reading "status system": {ioe}')
-            time.sleep(0.05)
+            time.sleep(0.025)
             print('try reconect...')
             self.read_status_system()
             print('reconect')
@@ -96,6 +98,7 @@ class ModbusConnect():
         '''
         чтение параметров по модбас из hvmcuti
         для отображения на дисплее
+        
         '''
         total_list = []
         for i in curr_param.keys():     
@@ -114,7 +117,7 @@ class ModbusConnect():
         return dict(total_list)
     
 
-    def write_execution_command(self, register_, value_=False):
+    def write_execution_command(self, register_, value_):
         '''
         set execution command: true = on, false = off
         functioncode=5
@@ -126,11 +129,12 @@ class ModbusConnect():
             self.instrument.write_bit(registeraddress=register_,
                                         value=value_,                                   
                                         functioncode=5,)
+                                        
             print(f'{register_} - writed = {value_}' )
-            debug_log(f'{register_} - writed = {value_}' )
+            info_log(f'{register_} - writed = {value_}' )
         except IOError as ioe:
             print (f'Error writing "execution_command": {ioe}')
-            time.sleep(0.05)
+            time.sleep(0.025) # time connection to system
             print('try reconect...')
             self.write_execution_command(register_, value_)
             print('reconect')
@@ -142,12 +146,14 @@ class ModbusConnect():
                                     number_of_decimals=degree_,
                                     functioncode=functioncode_,
                                     signed=signed_)
-            print(reg_value)
+            print(f'read from {register_} = {reg_value}')
+            info_log(f'read from {register_} = {reg_value}')
             return reg_value
 
         except IOError as ioe:
             print (f'Error reading one register: {ioe}')
-            time.sleep(0.05)
+            error_log(f'Error reading one register: {ioe}')
+            time.sleep(0.025) # time connection to system
             print('try reconect...')
             self.read_one_register(register_)
             print('reconect')
@@ -164,7 +170,7 @@ class ModbusConnect():
         
         except IOError as ioe:
             print(f'Error writing one register: {ioe}')
-            time.sleep(0.05)
+            time.sleep(0.025)
             print('try reconect...')
             self.write_one_register(register_,value_, degree_)
             print('reconect')
@@ -175,8 +181,10 @@ class ModbusConnect():
             all_param = self.instrument.read_registers(registeraddress=0,
                                                         number_of_registers=25, 
                                                         functioncode=4)
-                                
-            return {'U_ACC':round(all_param[3]*10**(-2),2),  
+            # проверка на отрицательность числа
+            all_param = [i-65536 if i>32767 else i for i in all_param]  # если число больше 32767 то оно отрицательно
+                               
+            return {'U_ACC':round(all_param[3]*10**(-2),2),                    
                     'I_FIL':round(all_param[5]*10**(-2),2),
                     'I_BOMB':all_param[6],
                     'U_BOMB':all_param[7], 
@@ -198,8 +206,8 @@ class ModbusConnect():
                     }
 
         except IOError as ioe:
-            debug_log(f'Error reading all param: {ioe}')
-            return (f'Error reading all param: {ioe}')
+            info_log(f'Error reading all param: {ioe}')
+            return (ioe)
            
             
     def close_connect(self):

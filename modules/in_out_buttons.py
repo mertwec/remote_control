@@ -107,34 +107,38 @@ class PinIO(ModbusConnect):
         print('event ON_UACC run')
 
     def callback_knob(self,chanel):
-
+        '''действие при нажатии кнопки
+        '''
         stat_system = self.read_status_system()  #read status system
-        
-        if chanel == self.KN_UACC:
-            if stat_system['stat_UACC'] == 1: # UACC - on
-                # off
-                self.fwrite_for_callback(register=self.execution_commands['exec_U_ACC'][0], value=False)
-            elif stat_system['stat_UACC'] == 0: # UACC - off
-                # on
-                self.fwrite_for_callback(register=self.execution_commands['exec_U_ACC'][0], value=True)
-        
-        elif chanel == self.KN_I_BOMB:
-            if stat_system['stat_IBOMB'] == 1: # ibomb - on
-                # off
-                self.fwrite_for_callback(register=self.execution_commands['exec_I_BOMB'][0], value=False)
-            elif stat_system['stat_IBOMB'] == 0: # ibomb - off
-                # on
-                self.fwrite_for_callback(register=self.execution_commands['exec_I_BOMB'][0], value=True)
-        
-        elif chanel == self.KN_I_WELD:
-            if stat_system['stat_IWELD'] == 1: # ibomb - on
-                # off
-                self.fwrite_for_callback(register=self.execution_commands['exec_I_WELD'][0], value=False)
-            elif stat_system['stat_IWELD'] == 0: # ibomb - off
-                # on
-                self.fwrite_for_callback(register=self.execution_commands['exec_I_WELD'][0], value=True)
-        else:
-            pass
+        try:
+            if chanel == self.KN_UACC:
+                if stat_system['stat_UACC'] == 1: # UACC - on
+                    # off
+                    self.fwrite_for_callback(register=self.execution_commands['exec_U_ACC'][0], value=False)
+                elif stat_system['stat_UACC'] == 0: # UACC - off
+                    # on
+                    self.fwrite_for_callback(register=self.execution_commands['exec_U_ACC'][0], value=True)
+            elif chanel == self.KN_I_BOMB:
+                if stat_system['stat_IBOMB'] == 1: # ibomb - on
+                    # off
+                    self.fwrite_for_callback(register=self.execution_commands['exec_I_BOMB'][0], value=False)
+                elif stat_system['stat_IBOMB'] == 0: # ibomb - off
+                    # on
+                    self.fwrite_for_callback(register=self.execution_commands['exec_I_BOMB'][0], value=True)
+            
+            elif chanel == self.KN_I_WELD:
+                if stat_system['stat_IWELD'] == 1: # ibomb - on
+                    # off
+                    self.fwrite_for_callback(register=self.execution_commands['exec_I_WELD'][0], value=False)
+                elif stat_system['stat_IWELD'] == 0: # ibomb - off
+                    # on
+                    self.fwrite_for_callback(register=self.execution_commands['exec_I_WELD'][0], value=True)
+            else:
+                pass
+        except TypeError as te:
+            print(f'Error in modul: "in_out_buttons" -- calback_knob: {te}')
+            time.sleep(0.05)
+            self.callback_knob(chanel)
         
     def run_system_on_knob(self): # btn = [self.KN_UACC, self.KN_I_BOMB, self.KN_I_WELD]
         '''

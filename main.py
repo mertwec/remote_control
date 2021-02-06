@@ -1,6 +1,5 @@
 #!/usr/bin/python3.7
 
-
 import sys
 import time
 from tkinter import *
@@ -8,8 +7,8 @@ import RPi.GPIO as GPIO
 import minimalmodbus
 import asyncio
 
-sys.path.append(['/home/pi/Desktop/pult_spreli_program/remote_control_SPRELI',
-                '/home/pi/Desktop/pult_spreli_program/remote_control_SPRELI/modules'])
+sys.path.append(['/home/pi/spreli/remote_control',
+                '/home/pi/spreli/remote_control/modules'])
 
 from modules.mask_logging import *
 
@@ -20,18 +19,20 @@ from modules.modbus485_mm import ModbusConnect
 from modules.focusing_config import SettFOC
 
 
-def open_startWindow():
-    roots = Tk()
-    roots.geometry("500x350+25+25")
-    appl_sw = StartWindow(roots)
-    appl_sw.mGrid_sw()
-    
-    roots.mainloop()
-
 def view_all_display(appl, gpio, parameters_:dict):
-    appl.change_all_display(gpio, parameters_)
-
+    '''main display update loop wrapper'''
+    try:
+        appl.change_all_display(gpio, parameters_)
+    except Exception as e:
+        print (f'error in "view_all_display": {e}')
+        error_log(f'error in "view_all_display": {e}')
+        appl.label_title['text'] = '-SPRELI PARAMETERS- status disconnect'
+        appl.indicator_error['bg'] = 'red'
+        time.sleep(0.1)
+        view_all_display(appl, gpio, parameters_)
+        
 def view_indicator_system(appl, gpio, parameters_:dict):
+    '''temp    '''
     try:
         appl.change_indicator(gpio, parameters_)
     except Exception as e:
@@ -42,6 +43,7 @@ def view_indicator_system(appl, gpio, parameters_:dict):
         view_indicator_system(appl, gpio, parameters_)
 
 def view_current_parameters(appl, parameters_:dict):  # param = (parameter, value)
+    '''temp    '''
     try:
         appl.change_parameters(parameters_)
     except Exception as e:
@@ -58,8 +60,9 @@ def view_progressbar(appl,startiweld):
 #---------------------------------------------------------------------#
 def change_use_chanel(i:bool):
     """
-    i=True remote control
-    i=False internal control
+    воспомогательная ф-ция -- задаётся внешнее или внутреннее чтение уставок
+    i=True: remote control
+    i=False: internal control
     """
     # using the internal welding current channel
     connect_mb.write_one_register(118,i)  # i weld
@@ -67,6 +70,7 @@ def change_use_chanel(i:bool):
     connect_mb.write_one_register(122,i) # i bomb
 
 def set_start_system(appl, connect, swiweld, dac, sfoc):
+    # начальные уставки системы при запуске
     appl.label_title['text'] = '-SPRELI PARAMETERS- status: conected'
     
     # Передача команд на выключение источника высокого напряжения, тока бомбардировки и тока сварки
@@ -78,9 +82,9 @@ def set_start_system(appl, connect, swiweld, dac, sfoc):
     # Задание тока сварки в соответствии с положением переключателя
     sw_iweld = swiweld.value_iweld()
     info_log(f'on switch IWELD: {sw_iweld}')
-    connect.write_one_register(register_=connect.register_set_i_weld[0],
+    connect.write_one_register(register_=connect.set_points['set_iweld'][0],
                                 value_=sw_iweld,
-                                degree_=connect.register_set_i_weld[1])
+                                degree_=connect.set_points['set_iweld'][1],)
     appl.progress_bar['value'] = sw_iweld
     
     # Чтение с накопителя уставки и калибровочных коэффициентов источника фокусировки
@@ -92,7 +96,7 @@ def set_start_system(appl, connect, swiweld, dac, sfoc):
 
 async def thread_gpio():
     gpio.run_system_on_signal() # listen on_uacc and on_weld
-    gpio.run_system_on_knob() # listen knobs
+    gpio.run_system_on_knob()   # listen knobs
 
 async def thread_view(application, gpio,start_iweld, system_parameters):
     view_all_display(application, gpio, system_parameters)
@@ -100,7 +104,9 @@ async def thread_view(application, gpio,start_iweld, system_parameters):
     #view_indicator_system(application, gpio, status_system)
     view_progressbar(application, start_iweld)
 
-        
+async def thread_mainloop(root):
+    info_log('start mainloop')
+    root.mainloop()      
 
 def connect_to_system(appl, connect, swiweld, dac, sfoc):
     '''init: проверка связи. конект через modbus'''
@@ -116,7 +122,7 @@ def connect_to_system(appl, connect, swiweld, dac, sfoc):
         start_iweld = switch.value_iweld()
             
         info_log(f'start parameters: {system_parameters}')    
-        print(status_system, '\n', system_parameters)
+        print(f'status system: {status_system} \n, system_parameters:{system_parameters}')
         
         #thread_gpio()
         #thread_view(appl, gpio, start_iweld, system_parameters)
@@ -124,9 +130,11 @@ def connect_to_system(appl, connect, swiweld, dac, sfoc):
         async def main():
             taskg = asyncio.create_task(thread_gpio())
             taskv = asyncio.create_task(thread_view(appl, gpio, start_iweld, system_parameters))
+            taskm = asyncio.create_task(thread_mainloop(root))
             
             await taskg
             await taskv
+            await taskm
         
         asyncio.run(main())
 
@@ -137,32 +145,39 @@ def connect_to_system(appl, connect, swiweld, dac, sfoc):
     
     
 if __name__ == "__main__":
-    
+    # создание экземпляров
     connect_mb = ModbusConnect()
-    sfoc = SettFOC(path='/home/pi/Desktop/pult_spreli_program/remote_control_SPRELI/settings_focus.conf')
+    sfoc = SettFOC(path='/home/pi/spreli/remote_control/settings_focus.conf')
     gpio = PinIO(GPIO)
     switch = ExtSwitcher()
     dac = DACModule()
     
-    gpio.set_start_state()    
-    info_log(f'modbus: {connect_mb} \n switcher: {switch}')
+    # уставки начального состояния пинов GPIO
+    gpio.set_start_state()     
+    
+    info_log(f'modbus: {connect_mb}')
+    info_log(f'switcher: {switch}')
     info_log(f'{gpio}')
-
+    
     root = Tk()
-    root.geometry("850x500+50+50")  # поместить окно в точку с координатам 100,100 и установить размер в 810x450
-    #root.attributes('-fullscreen', True)  #на весь экраna
+    #root.geometry("850x500+50+50")          # поместить окно в точку с координатам 100,100 и установить размер в 810x450
+    root.attributes('-fullscreen', True)    #на весь экраna
+    root.config(cursor='none')              # скрыть курсор
     application = MainWindow(root)
     application.mGrid()
     
     try:
         connect_to_system(application, connect_mb, switch, dac, sfoc)
-        info_log('start mainloop')
-        root.mainloop()
+        
+        #info_log('start mainloop')
+        #root.mainloop()
         
     except Exception as e:
         print(e)
         error_log(f'Error in __main__: {e} ')
+        time.sleep(0.1)
         application.disconnect(root)
+        error_log('try reconnect')
         connect_to_system(appl, connect, swiweld, dac, sfoc)
         root.mainloop()
 

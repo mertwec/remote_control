@@ -52,8 +52,9 @@ class DACModule(MainBus):
 class ExtSwitcher(MainBus):
     _keygen = [7, 11, 13, 14, 127, 191, 223, 239, 247, 251, 253, 254]
     _i_weld = [1, 5,  10, 20, 35,  50,  75,  100, 130, 160, 200, 250]
+    
 
-    def __init__(self, DEV_ADDR=(0x38, 0x39), _keygen=_keygen,_i_weld=_i_weld):
+    def __init__(self, DEV_ADDR=(0x38, 0x39), _keygen=_keygen, _i_weld=_i_weld[::-1]):
         self.addr_exp1 = DEV_ADDR[0] # 0x38 exp1
         self.addr_exp2 = DEV_ADDR[1] # 0x38 exp2
         self.DEV_ADDR = DEV_ADDR
@@ -83,7 +84,6 @@ class ExtSwitcher(MainBus):
     
     def value_iweld(self):
         return self.key_welding[self.read_switcher()]
-    
     
     
 
