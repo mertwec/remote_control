@@ -178,31 +178,31 @@ class ModbusConnect():
     
     def  read_all_parameters(self)->dict:
         try:
-            all_param = self.instrument.read_registers(registeraddress=0,
+            unsigned_all_param = self.instrument.read_registers(registeraddress=0,
                                                         number_of_registers=25, 
                                                         functioncode=4)
-            # проверка на отрицательность числа
-            all_param = [i-65536 if i>32767 else i for i in all_param]  # если число больше 32767 то оно отрицательно
-                               
-            return {'U_ACC':round(all_param[3]*10**(-2),2),                    
-                    'I_FIL':round(all_param[5]*10**(-2),2),
-                    'I_BOMB':all_param[6],
-                    'U_BOMB':all_param[7], 
-                    'I_WELD':round(all_param[4]*10**(-1),2),
-                    'U_LOCK':all_param[9],
-                    'AUX':round(all_param[10]*10**-2, 2),
-                    'U_WEHNELT':all_param[8],
-                    'TEMP':all_param[12],
-                    'U_POWER':round(all_param[11]*10**-2,2),
+            # преобразование всех чисел в знаковые
+            signed_all_param = [i-65536 if i>32767 else i for i in unsigned_all_param]  # если число больше 32767 то оно отрицательно
+        
+            return {'U_ACC':round(signed_all_param[3]*10**(-2),2),                    
+                    'I_FIL':round(signed_all_param[5]*10**(-2),2),
+                    'I_BOMB':round(signed_all_param[6]*10**(-1),2),
+                    'U_BOMB':signed_all_param[7], 
+                    'I_WELD':round(signed_all_param[4]*10**(-1),2),
+                    'U_LOCK':signed_all_param[9],
+                    'AUX':round(signed_all_param[10]*10**-2, 2),
+                    'U_WEHNELT':signed_all_param[8],
+                    'TEMP':signed_all_param[12],
+                    'U_POWER':round(signed_all_param[11]*10**-2,2),
                     
-                    'Error_current':all_param[1],
-                    'Error_last':all_param[2],
+                    'Error_current':unsigned_all_param[1],
+                    'Error_last':unsigned_all_param[2],
                     
-                    'sets_UACC':round(all_param[13]*10**(-2),2),
-                    'sets_IWELD':round(all_param[14]*10**(-1),2),
-                    'sets_IBOMB':round(all_param[16]*10**(-1),2),
+                    'sets_UACC':round(signed_all_param[13]*10**(-2),2),
+                    'sets_IWELD':round(signed_all_param[14]*10**(-1),2),
+                    'sets_IBOMB':round(signed_all_param[16]*10**(-1),2),
                     
-                    'status_system':bin(all_param[0]),
+                    'status_system':bin(unsigned_all_param[0]),
                     }
 
         except IOError as ioe:
