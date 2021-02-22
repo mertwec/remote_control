@@ -5,59 +5,21 @@ import time
 from tkinter import *
 import RPi.GPIO as GPIO
 import minimalmodbus
-import asyncio
+#import asyncio
+import threading
 
 sys.path.append(['/home/pi/spreli/remote_control',
                 '/home/pi/spreli/remote_control/modules'])
 
 from modules.mask_logging import *
 
-from modules.display_GUI import MainWindow,StartWindow
+from modules.display_GUI import MainWindow
 from modules.in_out_buttons import PinIO
 from modules.i2c_bus import DACModule, ExtSwitcher
 from modules.modbus485_mm import ModbusConnect
 from modules.focusing_config import SettFOC
 
 
-def view_all_display(appl, gpio, parameters_:dict):
-    '''main display update loop wrapper'''
-    try:
-        appl.change_all_display(gpio, parameters_)
-    except Exception as e:
-        print (f'error in "view_all_display": {e}')
-        error_log(f'error in "view_all_display": {e}')
-        appl.label_title['text'] = '-SPRELI PARAMETERS- status disconnect'
-        appl.indicator_error['bg'] = 'red'
-        time.sleep(0.1)
-        view_all_display(appl, gpio, parameters_)
-        
-def view_indicator_system(appl, gpio, parameters_:dict):
-    '''temp    '''
-    try:
-        appl.change_indicator(gpio, parameters_)
-    except Exception as e:
-        print (f'error in "view_indicator_system": {e}')
-        error_log(f'error in "view_indicator_system": {e}')
-
-        time.sleep(0.1)
-        view_indicator_system(appl, gpio, parameters_)
-
-def view_current_parameters(appl, parameters_:dict):  # param = (parameter, value)
-    '''temp    '''
-    try:
-        appl.change_parameters(parameters_)
-    except Exception as e:
-        print (f'error in "view_current_parameters": {e}')
-        error_log(f'error in "viev_current_parameter": {e}')
-        appl.label_title['text'] = '-SPRELI PARAMETERS- status disconnect'
-        appl.indicator_error['bg'] = 'red'
-        time.sleep(0.1)
-        view_current_parameters(appl, parameters_)
-
-def view_progressbar(appl,startiweld): 
-    appl.change_progressbar(appl.progress_bar,startiweld) 
-
-#---------------------------------------------------------------------#
 def change_use_chanel(i:bool):
     """
     воспомогательная ф-ция -- задаётся внешнее или внутреннее чтение уставок
@@ -69,7 +31,8 @@ def change_use_chanel(i:bool):
     connect_mb.write_one_register(116,i)  # uacc
     connect_mb.write_one_register(122,i) # i bomb
 
-def set_start_system(appl, connect, swiweld, dac, sfoc):
+
+def set_start_system(appl, connect, swiweld, dac, sfoc):  
     # начальные уставки системы при запуске
     appl.label_title['text'] = '-SPRELI PARAMETERS- status: conected'
     
@@ -94,21 +57,20 @@ def set_start_system(appl, connect, swiweld, dac, sfoc):
     dac.write_byte_dac(byte=dac_out)        
     debug_log(f'DAC OUT = {dac_out}')
 
-async def thread_gpio():
+def thread_gpio():
     gpio.run_system_on_signal() # listen on_uacc and on_weld
     gpio.run_system_on_knob()   # listen knobs
 
-async def thread_view(application, gpio,start_iweld, system_parameters):
-    view_all_display(application, gpio, system_parameters)
-    #view_current_parameters(application, system_parameters)       
-    #view_indicator_system(application, gpio, status_system)
-    view_progressbar(application, start_iweld)
+def thread_view(application, gpio, start_iweld, system_parameters):
+    print('start "change_all_display"')
+    application.change_all_display(gpio, start_iweld, system_parameters)
 
-async def thread_mainloop(root):
+def thread_mainloop(root):
+    print('start mainloop')
     info_log('start mainloop')
     root.mainloop()      
 
-def connect_to_system(appl, connect, swiweld, dac, sfoc):
+def main_connect_to_system(appl, connect, swiweld, dac, sfoc):
     '''init: проверка связи. конект через modbus'''
     # проверка связи с контроллером
     try:
@@ -121,27 +83,31 @@ def connect_to_system(appl, connect, swiweld, dac, sfoc):
         status_system = connect_mb.read_status_system()
         start_iweld = switch.value_iweld()
             
-        info_log(f'start parameters: {system_parameters}')    
-        print(f'status system: {status_system} \n, system_parameters:{system_parameters}')
+        info_log(f'start parameters: {system_parameters}')   
+        print(f'system_parameters:{system_parameters} \nI weld: {start_iweld}')
         
-        #thread_gpio()
-        #thread_view(appl, gpio, start_iweld, system_parameters)
-        
-        async def main():
-            taskg = asyncio.create_task(thread_gpio())
-            taskv = asyncio.create_task(thread_view(appl, gpio, start_iweld, system_parameters))
-            taskm = asyncio.create_task(thread_mainloop(root))
-            
-            await taskg
-            await taskv
-            await taskm
-        
-        asyncio.run(main())
+        #GIL
+        '''
+        gpio.run_system_on_signal() # listen on_uacc and on_weld
+        gpio.run_system_on_knob()   # listen knobs
+        application.change_all_display(gpio, start_iweld, system_parameters)
+        '''
+        #Thread
+        run1 = threading.Thread(target=gpio.run_system_on_signal)
+        run2 = threading.Thread(target=gpio.run_system_on_knob)
+        run3 = threading.Thread(target=application.change_all_display,
+                                    args=(gpio, start_iweld, system_parameters))
+
+        run1.start()
+        run2.start()
+        run3.start()
+
 
     except Exception as e:
         print('Error in "conect to system":', e)
         error_log(f'Error in "conect to system": {e}')
-        connect_to_system(appl, connect, swiweld, dac, sfoc)
+        time.sleep(0.05)
+        main_connect_to_system(appl, connect, swiweld, dac, sfoc)
     
     
 if __name__ == "__main__":
@@ -166,20 +132,12 @@ if __name__ == "__main__":
     application = MainWindow(root)
     application.mGrid()
     
-    try:
-        connect_to_system(application, connect_mb, switch, dac, sfoc)
-        
-        #info_log('start mainloop')
-        #root.mainloop()
-        
-    except Exception as e:
-        print(e)
-        error_log(f'Error in __main__: {e} ')
-        time.sleep(0.1)
-        application.disconnect(root)
-        error_log('try reconnect')
-        connect_to_system(appl, connect, swiweld, dac, sfoc)
-        root.mainloop()
+
+    main_connect_to_system(application, connect_mb, switch, dac, sfoc) 
+    root.mainloop()       
+
+    #application.disconnect(root)
+
 
 
 

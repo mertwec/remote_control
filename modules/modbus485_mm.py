@@ -2,10 +2,26 @@ import time
 import sys
 from pprint import pprint
 
-#from mask_logging import *
 import minimalmodbus as mm
 import serial
 from mask_logging import *
+
+
+# декоратор переподключения команд обращения к модбас
+def decorator_reconnect_for_exeption(function_):
+    def func_wrapper(self,*args,**kwargs):
+        try:
+            return function_(self,*args,**kwargs)            
+        except Exception as e: #IOError
+            print (f'Error in {function_.__name__}: {e}')
+            info_log(f'Error in {function_.__name__}: {e}')
+            time.sleep(0.05)           # time modbus connection = 0.014/0.017 s
+            print('try reconect...')
+            
+            return func_wrapper(self,*args,**kwargs)
+            info_log('reconnect')
+            print('reconect')
+    return func_wrapper
 
 
 class ModbusConnect():
@@ -25,7 +41,7 @@ class ModbusConnect():
         self.instrument.bytesize = serial.EIGHTBITS,
        
         #текущие параметры
-        self.CURRENT_PARAMETER={'U_ACC':(3, 2),  # param:(register, degree) 
+        self.CURRENT_PARAMETER={'U_ACC':(3, 2),  # param:(register, degree)
                                 'I_FIL':(5, 2),
                                 'I_BOMB':(6, 0),
                                 'U_BOMB':(7, 0),
@@ -38,7 +54,8 @@ class ModbusConnect():
                                 }
         # internal setpoint parameters
         # параметры уставки functionalcode = 3
-        self.set_points = {'set_iweld':(119,1),
+        
+        self.set_points = {'set_iweld':(113,1),
                             'set_uacc':(117,2),
                             'set_ibomb':(123,1)}
         
@@ -59,12 +76,12 @@ class ModbusConnect():
         print(f'connected: version = {check_pass1} {check_pass2}')
         return (check_pass1,check_pass2)
     
-    def parsing_status_system(self, bss:bin):
+    def parsing_status_system(self, bss:bin):        
+        #print(f'parsing stat syst:/n bss={bss}')
         if len(bss[2:])<16:
             mfullbss=('0'*(16-len(bss[2:]))+bss[2:])[::-1]      
         else:
-            mfullbss=bss[2:][::-1]
-                        
+            mfullbss=bss[2:][::-1]                                            
         return {'stat_UACC':int(mfullbss[10]), #1 reg
                 'stat_IBOMB':int(mfullbss[11]), #3 reg
                 'stat_IWELD':int(mfullbss[12]), #2 reg
@@ -72,6 +89,7 @@ class ModbusConnect():
                 'stat_failure':int(mfullbss[13]),
                 'stat_run':int(mfullbss[8])}
     
+    @decorator_reconnect_for_exeption
     def read_status_system(self)->dict:
         ''' 8bit = run 
         
@@ -80,25 +98,14 @@ class ModbusConnect():
             12bit = Iweld 0=off 1=on
             13bit = failure
         '''
-        try:
-            status_system = self.instrument.read_register(registeraddress=0,
-                                    functioncode=4)
-            bss=bin(status_system)
-            return self.parsing_status_system(bss)
-            
-        except IOError as ioe:
-            print (f'Error reading "status system": {ioe}')
-            debug_log(f'Error reading "status system": {ioe}')
-            time.sleep(0.025)
-            print('try reconect...')
-            self.read_status_system()
-            print('reconect')
-    
+        status_system = self.instrument.read_register(registeraddress=0,
+                                functioncode=4)
+        bss=bin(status_system)
+        return self.parsing_status_system(bss)
+
     def read_current_parameters(self, curr_param:dict)->dict:  # curr_param = {param:register}
         '''
-        чтение параметров по модбас из hvmcuti
-        для отображения на дисплее
-        
+        НЕ ИСПОЛЬЗУЕТСЯ  вместо нее "read_all_parameters"        
         '''
         total_list = []
         for i in curr_param.keys():     
@@ -116,7 +123,7 @@ class ModbusConnect():
             total_list.append((i,value_param))
         return dict(total_list)
     
-
+    @decorator_reconnect_for_exeption
     def write_execution_command(self, register_, value_):
         '''
         set execution command: true = on, false = off
@@ -125,57 +132,37 @@ class ModbusConnect():
 			reg2 -- I_WELD
 			reg3 -- I_FIL
         '''
-        try:
-            self.instrument.write_bit(registeraddress=register_,
-                                        value=value_,                                   
-                                        functioncode=5,)
-                                        
-            print(f'{register_} - writed = {value_}' )
-            info_log(f'{register_} - writed = {value_}' )
-        except IOError as ioe:
-            print (f'Error writing "execution_command": {ioe}')
-            time.sleep(0.025) # time connection to system
-            print('try reconect...')
-            self.write_execution_command(register_, value_)
-            print('reconect')
-        
+        self.instrument.write_bit(registeraddress=register_,
+                                    value=value_,                                   
+                                    functioncode=5,)
+                                    
+        print(f'{register_} - writed = {value_}' )
+        info_log(f'{register_} - writed = {value_}' )
 
+    @decorator_reconnect_for_exeption
     def read_one_register(self, register_,functioncode_=3, degree_=0, signed_=False):
-        try:
-            reg_value = self.instrument.read_register(registeraddress=register_,
-                                    number_of_decimals=degree_,
-                                    functioncode=functioncode_,
-                                    signed=signed_)
-            print(f'read from {register_} = {reg_value}')
-            info_log(f'read from {register_} = {reg_value}')
-            return reg_value
+        reg_value = self.instrument.read_register(registeraddress=register_,
+                                number_of_decimals=degree_,
+                                functioncode=functioncode_,
+                                signed=signed_)
+        print(f'read from {register_} = {reg_value}')
+        info_log(f'read from {register_} = {reg_value}')
+        return reg_value
 
-        except IOError as ioe:
-            print (f'Error reading one register: {ioe}')
-            error_log(f'Error reading one register: {ioe}')
-            time.sleep(0.025) # time connection to system
-            print('try reconect...')
-            self.read_one_register(register_)
-            print('reconect')
-    
-    
+    @decorator_reconnect_for_exeption
     def write_one_register(self, register_, value_, degree_=0, signed_= False):
-        try:
+        if value_ == None:
+            pass
+        else:
             self.instrument.write_register(registeraddress=register_,
-                                            value=value_,
-                                            number_of_decimals=degree_,
-                                            functioncode=6,
-                                            signed=signed_,)
-            print(f'{register_} - writed' )
+                                                value=value_,
+                                                number_of_decimals=degree_,
+                                                functioncode=6,
+                                                signed=signed_,)
+            print(f'OK-{register_} - writed {value_}' )
+            info_log(f'{register_} = writed {value_}')     
         
-        except IOError as ioe:
-            print(f'Error writing one register: {ioe}')
-            time.sleep(0.025)
-            print('try reconect...')
-            self.write_one_register(register_,value_, degree_)
-            print('reconect')
-        
-    
+    @decorator_reconnect_for_exeption
     def  read_all_parameters(self)->dict:
         try:
             unsigned_all_param = self.instrument.read_registers(registeraddress=0,
@@ -204,12 +191,10 @@ class ModbusConnect():
                     
                     'status_system':bin(unsigned_all_param[0]),
                     }
-
         except IOError as ioe:
             info_log(f'Error reading all param: {ioe}')
             return (ioe)
            
-            
     def close_connect(self):
         self.instrument.serial.close()
 
@@ -221,17 +206,27 @@ if __name__ == "__main__":
         con_.check_connect()
         #info_log(f'{con_.read_one_register(141,3,3)}')
         print(con_.instrument.serial)
+        
         pprint(con_.read_current_parameters(con_.CURRENT_PARAMETER))
+        print('\tall  parameters: \n', )
+        pprint(con_.read_all_parameters())
         
         con_.write_execution_command(register_=1, value_=0) #uacc
         con_.write_execution_command(register_=2, value_=0) #iweld
         con_.write_execution_command(register_=3, value_=0) #ibomb
         time.sleep(0.1)
+        
         print('\tstatus system:\n')
         pprint(con_.read_status_system())
-        print('\tall  parameters: \n', )
+        
+        '''
+        mall_param = con_.instrument.read_registers(registeraddress=0,
+                                                        number_of_registers=25, 
+                                                        functioncode=4)
+        print(mall_param)
+        print(mall_param[0])
         pprint(con_.read_all_parameters())
-    
+        '''
     except Exception as e:
         print(e)        
     finally:
