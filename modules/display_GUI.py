@@ -274,7 +274,7 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         self.fild_indicator_WC.grid(row=10, column=3, padx=7, pady=1)
 
     def show_message(self, mess):
-        messagebox.showwarning("error", mess,)# parent=Toplevel())
+        messagebox.showerror("error", mess,)# parent=Toplevel())
     
     def set_parameters(self, system_parameters):
         self.label_title.config(text='-SPRELI PARAMETERS- status: connected')
@@ -293,8 +293,7 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         self.label_displ_setIWELD.config(text=system_parameters['sets_IWELD'])
         self.label_displ_setIBOMB.config(text=system_parameters['sets_IBOMB'])
     
-    def set_indicator(self,stat_system):
-        
+    def set_indicator(self,stat_system):        
         if stat_system['stat_failure']==1:
             valueparam = ModbusConnect().read_one_register(register_= 1, functioncode_=4) # read code of error
             if valueparam == 0:
@@ -366,68 +365,6 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         self.master.after(self.time_total_update, 
                         self.change_all_display, 
                         gpio, startiweld, system_parameters)
-        
-#not use
-    def change_parameters(self, system_parameters):        
-        system_parameters = self.read_all_parameters()
-        if isinstance(system_parameters,dict):
-            self.set_parameters(system_parameters)
-        else:
-            print('____________________________________________')
-            self.label_title['text'] = '-SPRELI PARAMETERS- status disconnect'
-            self.indicator_error['bg'] = 'red'
-            self.indicator_error['text']='ERR: NC'
-            print('error in change_parameter', system_parameters)
-            time.sleep(0.5)            
-            self.change_parameters(system_parameters)
-        self.master.update_idletasks()
-        self.master.after(500, self.change_parameters, system_parameters)
-#not use            
-    def change_indicator(self, gpio, stat_system):
-        '''
-            'stat_UACC':int(mfullbss[10]), #1 reg
-            'stat_IBOMB':int(mfullbss[11]), #3 reg
-            'stat_IWELD':int(mfullbss[12]), #2 reg
-                
-            'stat_failure':int(mfullbss[13]),
-            'stat_run':int(mfullbss[8])}'''
-        stat_system = self.read_status_system()
-        #print(stat_system)
-        if isinstance(stat_system, dict):
-            gpio.set_output_VD(stat_system)
-            
-            self.label_title.config(text='-SPRELI PARAMETERS- status: connected')
-            self.set_indicator(stat_system)
-            
-        else:            
-            self.label_title['text'] = '-SPRELI PARAMETERS- status disconnect'
-            self.indicator_error['bg'] = 'red'
-            self.indicator_error['text']='ERR: NC'
-            print('error in change_indicator',system_parameters)
-            time.sleep(0.5)
-            self.change_indicator(gpio, system_parameters)
-        
-        self.master.update_idletasks()
-        self.master.after(500, self.change_indicator, gpio, stat_system)
-# not use
-    def change_progressbar(self, startiweld):        
-        try:
-            iweld = ExtSwitcher().value_iweld()            
-            if iweld!=startiweld:  
-                self.progress_bar['value'] = iweld
-                startiweld = iweld
-                ModbusConnect().write_one_register(register_=ModbusConnect().set_points['set_iweld'][0],
-                                        value_=iweld,
-                                        degree_=ModbusConnect().set_points['set_iweld'][1])
-                print(f'change iweld to: {startiweld}')
-                
-            self.master.update_idletasks()
-            prbar.after(500, self.change_progressbar, prbar, startiweld)
-            
-        except Exception as e:
-            print(f'Error switcher in "change_progressbar": {e}')
-            time.sleep(0.1)
-            self.change_progressbar(prbar, startiweld)
 
     def disconnect(self, master):
         ModbusConnect().close_connect()
@@ -673,9 +610,7 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
                 self.createConfig(r_dict)                        
                 self.write_byte_dac(self.calculateDAC(r_dict))
                
-
-    
-    
+               
 def open_setFocWindows():
     '''open windows setting focusing
     '''

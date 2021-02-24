@@ -5,7 +5,20 @@ from modbus485_mm import ModbusConnect
 from i2c_bus import ExtSwitcher
 from focusing_config import SettFOC
 
+import threading as thr
 
+
+def decorator_cal_in_thread(function_):
+    def wrapper(self,*args,**kwargs):
+        try:
+            run_thread=thr.Thread(target=function_, args=(self,*args,))
+            run_thread.daemon = True
+            run_thread.start() 
+        except TypeError as te:
+            print(f'Error in modul: "in_out_buttons" {function_.__name__}: {te}')
+            time.sleep(0.05)
+            return wrapper(self, chanel)
+    return wrapper
 
 class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
     
@@ -46,7 +59,7 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
 
         GPIO.setup(self.pins_knob, GPIO.IN, pull_up_down=GPIO.PUD_UP) # knobs
         GPIO.setup(self.pins_rule, GPIO.IN, pull_up_down=GPIO.PUD_UP) #
-        GPIO.setup(self.pins_vd, GPIO.OUT, initial=GPIO.HIGH) # OUT signal in 1
+        GPIO.setup(self.pins_vd, GPIO.OUT, initial=GPIO.LOW) # OUT signal in 1
 
     #!!!!!!!!! run in cykle !!!!!!!!!!!!!!!!!!!
     def set_output_VD(self, stat_system:dict, value_ibomb, setted_ibomb): #
@@ -67,7 +80,7 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
         if value_ibomb >= setted_ibomb*0.85:
             GPIO.output(self.VD_ON_FIL, stat_system['stat_IBOMB'])
         else:
-            GPIO.output(self.VD_ON_FIL, 1)
+            GPIO.output(self.VD_ON_FIL, 0)
 
     
     def fwrite_for_callback(self, register:int, value:bool):
@@ -86,8 +99,11 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
                                     signed_= False)
             self.fwrite_for_callback(register, True)        # on Iweld
             
-            time.sleep(time_wait)
-            
+            for i in range(time_wait):
+                print(f'sleep {i}')
+                time.sleep(1)
+                
+            value_set = ExtSwitcher().value_iweld()
             ModbusConnect().write_one_register(register_=ModbusConnect().set_points['set_iweld'][0],     
                                     value_=value_set,       # set IWELD in set value
                                     degree_=ModbusConnect().set_points['set_iweld'][1], 
@@ -95,7 +111,8 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
         else:
             print(f'Error in {fwrite_softstart_IWELD.__name__}')
             self.fwrite_for_callback(register, False)
-            
+    
+    @decorator_cal_in_thread
     def callback_ON_WELD(self, chanel):
         ''' вызов при изменении состояния на пине ON-I_WELD
         execution_commands from modbus485_mm
@@ -107,7 +124,8 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
             print('callback_ON_WELD on', GPIO.input(self.ON_WELD))
             #self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0], value=True)
             self.fwrite_softstart_IWELD(register=ModbusConnect().execution_commands['exec_I_WELD'][0])
-
+    
+    @decorator_cal_in_thread
     def callback_ON_UACC(self, chanel):
         # вызов при изменении состояния на пине ON-UACC
         if GPIO.input(self.ON_UACC) == 1:
@@ -137,48 +155,45 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
         GPIO.add_event_detect(self.ON_UACC, GPIO.BOTH, 
                                 callback=self.callback_ON_UACC, bouncetime=200)
         print('event ON_UACC run')
-
+    
+    @decorator_cal_in_thread
     def callback_knob(self, chanel):
         '''действие при нажатии кнопки
         '''
         stat_system = ModbusConnect().read_status_system()  #read status system
-        try:
-            if chanel == self.KN_UACC:
-                if stat_system['stat_UACC'] == 1: # UACC - on
-                    # off
-                    self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_U_ACC'][0],
-                                                value=False)
-                elif stat_system['stat_UACC'] == 0: # UACC - off
-                    # on
-                    self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_U_ACC'][0],
-                                                value=True)
+
+        if chanel == self.KN_UACC:
+            if stat_system['stat_UACC'] == 1: # UACC - on
+                # off
+                self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_U_ACC'][0],
+                                            value=False)
+            elif stat_system['stat_UACC'] == 0: # UACC - off
+                # on
+                self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_U_ACC'][0],
+                                            value=True)
+                                            
+        elif chanel == self.KN_I_BOMB:
+            if stat_system['stat_IBOMB'] == 1: # ibomb - on
+                # off
+                self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_BOMB'][0],
+                                            value=False)
+            elif stat_system['stat_IBOMB'] == 0: # ibomb - off
+                # on
+                self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_BOMB'][0],
+                                            value=True)
+        
+        elif chanel == self.KN_I_WELD:
+            if stat_system['stat_IWELD'] == 1: # ibomb - on
+                # off
+                self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0],
+                                            value=False)
+            elif stat_system['stat_IWELD'] == 0: # ibomb - off
+                # on
+                #self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0], value=True)
+                self.fwrite_softstart_IWELD(register=ModbusConnect().execution_commands['exec_I_WELD'][0],)
                                                 
-            elif chanel == self.KN_I_BOMB:
-                if stat_system['stat_IBOMB'] == 1: # ibomb - on
-                    # off
-                    self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_BOMB'][0],
-                                                value=False)
-                elif stat_system['stat_IBOMB'] == 0: # ibomb - off
-                    # on
-                    self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_BOMB'][0],
-                                                value=True)
-            
-            elif chanel == self.KN_I_WELD:
-                if stat_system['stat_IWELD'] == 1: # ibomb - on
-                    # off
-                    self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0],
-                                                value=False)
-                elif stat_system['stat_IWELD'] == 0: # ibomb - off
-                    # on
-                    #self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0], value=True)
-                    self.fwrite_softstart_IWELD(register=ModbusConnect().execution_commands['exec_I_WELD'][0],)
-                                                    
-            else:
-                pass
-        except TypeError as te:
-            print(f'Error in modul: "in_out_buttons" -- callback_knob: {te}')
-            time.sleep(0.05)
-            self.callback_knob(chanel)
+        else:
+            pass
         
     def run_system_on_knob(self): # btn = [self.KN_UACC, self.KN_I_BOMB, self.KN_I_WELD]
         '''
@@ -190,12 +205,28 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
             фронт из 1 в 0 – команда контроллеру на включение тока сварки при текущем статусе «Выкл», на выключение при статусе «Вкл»;
 
         '''
-        for knob in self.pins_knob:
+        for knob in self.pins_knob[:2]:
             GPIO.add_event_detect(knob, GPIO.FALLING, bouncetime=300,
                                 callback=self.callback_knob)
             print(f'event knob {knob} run')
-
-
+    
+    @decorator_cal_in_thread
+    def callback_knob_iweld(self, chanel):
+        stat_system = ModbusConnect().read_status_system()  #read status system
+        if stat_system['stat_IWELD'] == 1: # ibomb - on
+            # off
+            self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0],
+                                        value=False)
+        elif stat_system['stat_IWELD'] == 0: # ibomb - off
+            # on
+            #self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0], value=True)
+            self.fwrite_softstart_IWELD(register=ModbusConnect().execution_commands['exec_I_WELD'][0],)
+            
+    def run_knob_iweld(self):
+        GPIO.add_event_detect(self.KN_I_WELD, GPIO.FALLING, bouncetime=300,
+                                callback=self.callback_knob_iweld)
+        print(f'event knob {self.KN_I_WELD} run')
+    
 
 if __name__ == "__main__":
     gpio = PinIO(GPIO,)
@@ -212,7 +243,7 @@ if __name__ == "__main__":
 
     gpio.run_system_on_signal()
     gpio.run_system_on_knob()
-
+    gpio.run_knob_iweld()
     try:
         n=0
         while True:

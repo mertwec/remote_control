@@ -16,11 +16,10 @@ def decorator_reconnect_for_exeption(function_):
             print (f'Error in {function_.__name__}: {e}')
             info_log(f'Error in {function_.__name__}: {e}')
             time.sleep(0.05)           # time modbus connection = 0.014/0.017 s
-            print('try reconect...')
-            
+            print('try reconect...')            
             return func_wrapper(self,*args,**kwargs)
             info_log('reconnect')
-            print('reconect')
+            print('reconnect')
     return func_wrapper
 
 
@@ -168,7 +167,7 @@ class ModbusConnect():
             unsigned_all_param = self.instrument.read_registers(registeraddress=0,
                                                         number_of_registers=25, 
                                                         functioncode=4)
-            # преобразование всех чисел в знаковые
+            # преобразование всех чисел в знаковые (может быть отрицателен)
             signed_all_param = [i-65536 if i>32767 else i for i in unsigned_all_param]  # если число больше 32767 то оно отрицательно
         
             return {'U_ACC':round(signed_all_param[3]*10**(-2),2),                    
@@ -194,7 +193,11 @@ class ModbusConnect():
         except IOError as ioe:
             info_log(f'Error reading all param: {ioe}')
             return (ioe)
-           
+    
+    def parsing_parameters_for_label(self, parameters:dict):
+        if isinstance (parameters, dict):
+            pass
+    
     def close_connect(self):
         self.instrument.serial.close()
 

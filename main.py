@@ -7,6 +7,7 @@ import RPi.GPIO as GPIO
 import minimalmodbus
 #import asyncio
 import threading
+from multiprocessing import Process
 
 sys.path.append(['/home/pi/spreli/remote_control',
                 '/home/pi/spreli/remote_control/modules'])
@@ -93,16 +94,23 @@ def main_connect_to_system(appl, connect, swiweld, dac, sfoc):
         application.change_all_display(gpio, start_iweld, system_parameters)
         '''
         #Thread
+        
         run1 = threading.Thread(target=gpio.run_system_on_signal)
         run2 = threading.Thread(target=gpio.run_system_on_knob)
         run3 = threading.Thread(target=application.change_all_display,
                                     args=(gpio, start_iweld, system_parameters))
-
+        run4 = threading.Thread(target=gpio.run_knob_iweld)
+        
+        run4.daemon = True
+        run1.daemon = True
+        run2.daemon = True
+        run3.daemon = True
+        
         run1.start()
         run2.start()
         run3.start()
-
-
+        run4.start()
+       
     except Exception as e:
         print('Error in "conect to system":', e)
         error_log(f'Error in "conect to system": {e}')
