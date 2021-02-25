@@ -101,7 +101,8 @@ class ModbusConnect():
                                 functioncode=4)
         bss=bin(status_system)
         return self.parsing_status_system(bss)
-
+    
+    """
     def read_current_parameters(self, curr_param:dict)->dict:  # curr_param = {param:register}
         '''
         НЕ ИСПОЛЬЗУЕТСЯ  вместо нее "read_all_parameters"        
@@ -121,7 +122,7 @@ class ModbusConnect():
             #info_log(f'current param: {i}:{value_param}')
             total_list.append((i,value_param))
         return dict(total_list)
-    
+    """
     @decorator_reconnect_for_exeption
     def write_execution_command(self, register_, value_):
         '''
@@ -139,7 +140,7 @@ class ModbusConnect():
         info_log(f'{register_} - writed = {value_}' )
 
     @decorator_reconnect_for_exeption
-    def read_one_register(self, register_,functioncode_=3, degree_=0, signed_=False):
+    def read_one_register(self, register_, degree_=0, functioncode_=3, signed_=False):
         reg_value = self.instrument.read_register(registeraddress=register_,
                                 number_of_decimals=degree_,
                                 functioncode=functioncode_,
@@ -147,11 +148,13 @@ class ModbusConnect():
         print(f'read from {register_} = {reg_value}')
         info_log(f'read from {register_} = {reg_value}')
         return reg_value
-
+        
     @decorator_reconnect_for_exeption
     def write_one_register(self, register_, value_, degree_=0, signed_= False):
         if value_ == None:
             pass
+        elif value_ == self.read_one_register(register_=register_, degree_ = degree_):
+            print ('nothing writing')
         else:
             self.instrument.write_register(registeraddress=register_,
                                                 value=value_,
@@ -163,56 +166,65 @@ class ModbusConnect():
         
     @decorator_reconnect_for_exeption
     def  read_all_parameters(self)->dict:
-        try:
-            unsigned_all_param = self.instrument.read_registers(registeraddress=0,
-                                                        number_of_registers=25, 
-                                                        functioncode=4)
-            # преобразование всех чисел в знаковые (может быть отрицателен)
-            signed_all_param = [i-65536 if i>32767 else i for i in unsigned_all_param]  # если число больше 32767 то оно отрицательно
         
-            return {'U_ACC':round(signed_all_param[3]*10**(-2),2),                    
-                    'I_FIL':round(signed_all_param[5]*10**(-2),2),
-                    'I_BOMB':round(signed_all_param[6]*10**(-1),2),
-                    'U_BOMB':signed_all_param[7], 
-                    'I_WELD':round(signed_all_param[4]*10**(-1),2),
-                    'U_LOCK':signed_all_param[9],
-                    'AUX':round(signed_all_param[10]*10**-2, 2),
-                    'U_WEHNELT':signed_all_param[8],
-                    'TEMP':signed_all_param[12],
-                    'U_POWER':round(signed_all_param[11]*10**-2,2),
-                    
-                    'Error_current':unsigned_all_param[1],
-                    'Error_last':unsigned_all_param[2],
-                    
-                    'sets_UACC':round(signed_all_param[13]*10**(-2),2),
-                    'sets_IWELD':round(signed_all_param[14]*10**(-1),2),
-                    'sets_IBOMB':round(signed_all_param[16]*10**(-1),2),
-                    
-                    'status_system':bin(unsigned_all_param[0]),
-                    }
-        except IOError as ioe:
-            info_log(f'Error reading all param: {ioe}')
-            return (ioe)
+        unsigned_all_param = self.instrument.read_registers(registeraddress=0,
+                                                    number_of_registers=25, 
+                                                    functioncode=4)
+        if unsigned_all_param[12]>32767:   # TEMP < 0
+            unsigned_all_param[12] = unsigned_all_param[12]-65536
+
+        # преобразование всех чисел в знаковые (может быть отрицателен)
+        #signed_all_param = [i-65536 if i>32767 else i for i in unsigned_all_param]  # если число больше 32767 то оно отрицательно
+        unsigned_all_param_zero = [0 if i>32767 else i for i in unsigned_all_param]
+        
+        return {'U_ACC':round(unsigned_all_param_zero[3]*10**(-2),2),                    
+                'I_FIL':round(unsigned_all_param_zero[5]*10**(-2),2),
+                'I_BOMB':round(unsigned_all_param_zero[6]*10**(-1),2),
+                'U_BOMB':unsigned_all_param_zero[7], 
+                'I_WELD':round(unsigned_all_param_zero[4]*10**(-1),2),
+                'U_LOCK':unsigned_all_param_zero[9],
+                'AUX':round(unsigned_all_param_zero[10]*10**-2, 2),
+                'U_WEHNELT':unsigned_all_param_zero[8],
+                'TEMP':unsigned_all_param[12],
+                'U_POWER':round(unsigned_all_param_zero[11]*10**-2,2),
+                
+                'Error_current':unsigned_all_param[1],
+                'Error_last':unsigned_all_param[2],
+                
+                'sets_UACC':round(unsigned_all_param_zero[13]*10**(-2),2),
+                'sets_IWELD':round(unsigned_all_param_zero[14]*10**(-1),2),
+                'sets_IBOMB':round(unsigned_all_param_zero[16]*10**(-1),2),
+                
+                'status_system':bin(unsigned_all_param[0]),
+                }
     
-    def parsing_parameters_for_label(self, parameters:dict):
-        if isinstance (parameters, dict):
-            pass
-    
+    def transform_parameters_to_str(self, parameters:dict):
+        if isinstance(parameters, dict):
+            string_paramerters = {}
+            for key, value in parameters.items():
+                if isinstance(value,float) and len(str(value).split('.')[1]) == 1:
+                    string_paramerters.update({key:str(value)+'0'})
+                else:
+                    string_paramerters.update({key:str(value)})
+            return string_paramerters 
+        else: 
+            return parameters # return IOError from 'read_all_parameters'
+                
     def close_connect(self):
         self.instrument.serial.close()
 
             
 if __name__ == "__main__":
-    from mask_logging import *
     con_ = ModbusConnect()      
     try:        
         con_.check_connect()
-        #info_log(f'{con_.read_one_register(141,3,3)}')
         print(con_.instrument.serial)
         
-        pprint(con_.read_current_parameters(con_.CURRENT_PARAMETER))
+        all_param = con_.read_all_parameters()
+        stat_syst = con_.read_status_system()
+        
         print('\tall  parameters: \n', )
-        pprint(con_.read_all_parameters())
+        pprint(all_param)
         
         con_.write_execution_command(register_=1, value_=0) #uacc
         con_.write_execution_command(register_=2, value_=0) #iweld
@@ -220,7 +232,9 @@ if __name__ == "__main__":
         time.sleep(0.1)
         
         print('\tstatus system:\n')
-        pprint(con_.read_status_system())
+        pprint(stat_syst)
+        
+        ##pprint(con_.transform_parameters_to_str(all_param))
         
         '''
         mall_param = con_.instrument.read_registers(registeraddress=0,

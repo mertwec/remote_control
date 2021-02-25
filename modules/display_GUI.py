@@ -241,13 +241,13 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         #self.label_text_set.grid(row=7, column=0, sticky=W, padx=27, pady=3)
         
         self.label_text_setUACC.grid(row=7, column=0, sticky='SE', padx=7, pady=2)
-        self.label_displ_setUACC.grid(row=8, column=0, sticky='SW', padx=7, pady=1)
+        self.label_displ_setUACC.grid(row=8, column=0, sticky='SE', padx=7, pady=1)
         
         self.label_text_setIBOMB.grid(row=7, column=1, sticky='SE', padx=7, pady=2)
-        self.label_displ_setIBOMB.grid(row=8, column=1, sticky='SW', padx=7, pady=1)
+        self.label_displ_setIBOMB.grid(row=8, column=1, sticky='SE', padx=7, pady=1)
         
         self.label_text_setIWELD.grid(row=7, column=2, sticky='SE', padx=7, pady=2)
-        self.label_displ_setIWELD.grid(row=8, column=2, sticky='SW', padx=7, pady=1)
+        self.label_displ_setIWELD.grid(row=8, column=2, sticky='SE', padx=7, pady=1)
 
         # progress bar
         self.label_text_pb.grid(row=1, column=3, sticky=S, padx=7, pady=2)
@@ -277,6 +277,12 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         messagebox.showerror("error", mess,)# parent=Toplevel())
     
     def set_parameters(self, system_parameters):
+        self.label_displ_setUACC.config(text=system_parameters['sets_UACC'])
+        self.label_displ_setIWELD.config(text=system_parameters['sets_IWELD'])
+        self.label_displ_setIBOMB.config(text=system_parameters['sets_IBOMB'])
+        
+        system_parameters = ModbusConnect().transform_parameters_to_str(system_parameters)
+        
         self.label_title.config(text='-SPRELI PARAMETERS- status: connected')
         self.label_displ_U_ACC.config(text=system_parameters['U_ACC'])        
         self.label_displ_U_POW.config(text=system_parameters['U_POWER'])
@@ -289,10 +295,6 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         self.label_displ_TEMP.config(text=system_parameters['TEMP'])
         self.label_displ_I_WELD.config(text=system_parameters['I_WELD'])
 
-        self.label_displ_setUACC.config(text=system_parameters['sets_UACC'])
-        self.label_displ_setIWELD.config(text=system_parameters['sets_IWELD'])
-        self.label_displ_setIBOMB.config(text=system_parameters['sets_IBOMB'])
-    
     def set_indicator(self,stat_system):        
         if stat_system['stat_failure']==1:
             valueparam = ModbusConnect().read_one_register(register_= 1, functioncode_=4) # read code of error
@@ -329,10 +331,10 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         system_parameters = ModbusConnect().read_all_parameters()
 
         if isinstance(system_parameters, dict):            
-            stat_system = ModbusConnect().parsing_status_system(system_parameters['status_system'])
+            status_system = ModbusConnect().parsing_status_system(system_parameters['status_system'])
             
             self.set_parameters(system_parameters) 
-            self.set_indicator(stat_system)
+            self.set_indicator(status_system)
             
             #self.set_progressbar(startiweld)
             iweld=ExtSwitcher().value_iweld()
@@ -345,22 +347,21 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
                                     degree_=ModbusConnect().set_points['set_iweld'][1])
             else:
                 pass
-                
-            gpio.set_output_VD(stat_system, 
+
+            gpio.set_outside_knob(status_system)                
+            gpio.set_output_VD(status_system, 
                                 value_ibomb=system_parameters['I_BOMB'],
                                 setted_ibomb=system_parameters['sets_IBOMB']) #register
                                
         else:
             print('____________________________________________')
-            self.label_title.config(text='-SPRELI PARAMETERS- status: disconnect')
+            #self.label_title.config(text='-SPRELI PARAMETERS- status: disconnect')
             #self.indicator_error['bg'] = 'red'
             self.indicator_error['text']='ERR: NC'
             self.master.update()
             print('error in change_all_parameter', system_parameters)
             error_log(f'error in change_all_display:{system_parameters}')
-            #time.sleep(0.5)            
-            #self.change_all_display(gpio, startiweld, system_parameters)
-        
+                   
         self.master.update_idletasks()
         self.master.after(self.time_total_update, 
                         self.change_all_display, 
@@ -556,8 +557,12 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
         self.I_BOMB = self.read_entry_fields()['I_BOMB']
         self.U_ACC = self.read_entry_fields()['U_ACC']
         
-        ModbusConnect().write_one_register(123, value_=self.I_BOMB, degree_=1,)
-        ModbusConnect().write_one_register(117, value_=self.U_ACC, degree_=2,)
+        ModbusConnect().write_one_register(register_=ModbusConnect().set_points['set_ibomb'][0], 
+                                    value_=self.I_BOMB, 
+                                    degree_=ModbusConnect().set_points['set_ibomb'][1])
+        ModbusConnect().write_one_register(register_=ModbusConnect().set_points['set_uacc'][0],
+                                    value_=self.U_ACC, 
+                                    degree_=ModbusConnect().set_points['set_uacc'][1])
     
     def change_ibomb_uacc(self, sign, step):
         '''

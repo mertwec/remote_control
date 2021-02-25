@@ -8,12 +8,13 @@ from focusing_config import SettFOC
 import threading as thr
 
 
-def decorator_cal_in_thread(function_):
+def decorator_call_in_thread(function_):
     def wrapper(self,*args,**kwargs):
         try:
             run_thread=thr.Thread(target=function_, args=(self,*args,))
             run_thread.daemon = True
             run_thread.start() 
+            print(run_thread.getName())
         except TypeError as te:
             print(f'Error in modul: "in_out_buttons" {function_.__name__}: {te}')
             time.sleep(0.05)
@@ -60,8 +61,8 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
         GPIO.setup(self.pins_knob, GPIO.IN, pull_up_down=GPIO.PUD_UP) # knobs
         GPIO.setup(self.pins_rule, GPIO.IN, pull_up_down=GPIO.PUD_UP) #
         GPIO.setup(self.pins_vd, GPIO.OUT, initial=GPIO.LOW) # OUT signal in 1
-
-    #!!!!!!!!! run in cykle !!!!!!!!!!!!!!!!!!!
+    
+#!!!!!!!!!!!!!! run in cykle !!!!!!!!!!!!!!!!!!!
     def set_output_VD(self, stat_system:dict, value_ibomb, setted_ibomb): #
         '''
             1.1.	Выходной сигнал VD_ON_UACC:
@@ -82,7 +83,31 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
         else:
             GPIO.output(self.VD_ON_FIL, 0)
 
+    def set_outside_knob(self, status_system:dict):
+        '''если кнопка нажата (on), а система не включена (off) то вызвать 
+        обработчик сигнала "calback_on_weld " или "callback_on_uacc"
+        in pin --- 1=off; 0=on
+        in system --- 1=on: 0=off
+        '''
+        try:
+            pin_iweld = GPIO.input(self.ON_WELD) # 1=off; 0=on
+            pin_uacc = GPIO.input(self.ON_UACC)
+            status_on_iweld = status_system['stat_IWELD'] # 1=on: 0=off
+            status_on_uacc = status_system['stat_UACC']
+            if pin_iweld==0 or pin_uacc == 0:
+                self.remove_system_on_knob()
+                if pin_iweld == status_on_iweld:
+                    self.callback_ON_WELD(self.ON_WELD)
+                if pin_uacc == status_on_uacc:
+                    self.callback_ON_UACC(self.ON_UACC)
+            elif pin_iweld==1 or pin_uacc==1:
+                self.run_system_on_knob()
+        except RuntimeError as rte:
+            #print(f'RuntimeError {rte}')
+            pass
     
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+        
     def fwrite_for_callback(self, register:int, value:bool):
         # helper function
         ModbusConnect().write_execution_command(register_=register, value_=value)
@@ -112,20 +137,23 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
             print(f'Error in {fwrite_softstart_IWELD.__name__}')
             self.fwrite_for_callback(register, False)
     
-    @decorator_cal_in_thread
-    def callback_ON_WELD(self, chanel):
+    @decorator_call_in_thread
+    def callback_ON_WELD(self, chanel): #self.ON_WELD
         ''' вызов при изменении состояния на пине ON-I_WELD
         execution_commands from modbus485_mm
         '''        
-        if GPIO.input(self.ON_WELD) == 1:
-            print('callback_ON_WELD off', GPIO.input(self.ON_WELD))
-            self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0], value=False)
-        elif GPIO.input(self.ON_WELD) == 0:
-            print('callback_ON_WELD on', GPIO.input(self.ON_WELD))
+        if GPIO.input(chanel) == 1:
+            print('callback_ON_WELD off', GPIO.input(chanel))
+            self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0], 
+                                    value=False)
+        elif GPIO.input(chanel) == 0:
+            print('callback_ON_WELD on', GPIO.input(chanel))
             #self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0], value=True)
             self.fwrite_softstart_IWELD(register=ModbusConnect().execution_commands['exec_I_WELD'][0])
-    
-    @decorator_cal_in_thread
+        else:
+            print(f' in chanel {chanel} -- none type')
+            
+    #@decorator_call_in_thread
     def callback_ON_UACC(self, chanel):
         # вызов при изменении состояния на пине ON-UACC
         if GPIO.input(self.ON_UACC) == 1:
@@ -138,25 +166,10 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
             self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_U_ACC'][0], value=True)
             time.sleep(0.15)
             self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_BOMB'][0], value=True)
-
-    def run_system_on_signal(self):
-        '''    Входной сигнал ON_WELD:
-            фронт из 1 в 0 – команда контроллеру на включение тока сварки,
-            фронт из 0 в 1 – команда контроллеру на выключение тока сварки;
-        '''
-        GPIO.add_event_detect(self.ON_WELD, GPIO.BOTH, 
-                                callback=self.callback_ON_WELD, bouncetime=200)
-        print('event ON_WELD run')
-
-        '''     Входной сигнал ON_UACC:
-            фронт из 1 в 0 – команда контроллеру на включение источника ускоряющего напряжения, затем команда контроллеру на включение тока бомбардировки,
-            фронт из 0 в 1 – команда контроллеру на выключение тока бомбардировки, затем команда контроллеру на выключение источника ускоряющего напряжения;
-        '''
-        GPIO.add_event_detect(self.ON_UACC, GPIO.BOTH, 
-                                callback=self.callback_ON_UACC, bouncetime=200)
-        print('event ON_UACC run')
-    
-    @decorator_cal_in_thread
+        else:
+            print(f' in chanel {chanel} -- none type')
+     
+    #@decorator_call_in_thread
     def callback_knob(self, chanel):
         '''действие при нажатии кнопки
         '''
@@ -171,7 +184,6 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
                 # on
                 self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_U_ACC'][0],
                                             value=True)
-                                            
         elif chanel == self.KN_I_BOMB:
             if stat_system['stat_IBOMB'] == 1: # ibomb - on
                 # off
@@ -180,8 +192,7 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
             elif stat_system['stat_IBOMB'] == 0: # ibomb - off
                 # on
                 self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_BOMB'][0],
-                                            value=True)
-        
+                                            value=True)        
         elif chanel == self.KN_I_WELD:
             if stat_system['stat_IWELD'] == 1: # ibomb - on
                 # off
@@ -190,27 +201,12 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
             elif stat_system['stat_IWELD'] == 0: # ibomb - off
                 # on
                 #self.fwrite_for_callback(register=ModbusConnect().execution_commands['exec_I_WELD'][0], value=True)
-                self.fwrite_softstart_IWELD(register=ModbusConnect().execution_commands['exec_I_WELD'][0],)
-                                                
+                self.fwrite_softstart_IWELD(register=ModbusConnect().execution_commands['exec_I_WELD'][0],
+                                                        )
         else:
             pass
-        
-    def run_system_on_knob(self): # btn = [self.KN_UACC, self.KN_I_BOMB, self.KN_I_WELD]
-        '''
-        Bходной сигнал KN_ON_OFF_UACC:
-            фронт из 1 в 0 – команда контроллеру на включение источника ускоряющего напряжения, при текущем статусе «Выкл»; на выключение при статусе «Вкл»;
-        Входной сигнал KN_ON_OFF_I_BOMB:
-            фронт из 1 в 0 – команда контроллеру на включение тока бомбардировки при текущем статусе «Выкл»; на выключение при статусе «Вкл»;
-        Входной сигнал KN_ON_OFF_I_WELD:
-            фронт из 1 в 0 – команда контроллеру на включение тока сварки при текущем статусе «Выкл», на выключение при статусе «Вкл»;
-
-        '''
-        for knob in self.pins_knob[:2]:
-            GPIO.add_event_detect(knob, GPIO.FALLING, bouncetime=300,
-                                callback=self.callback_knob)
-            print(f'event knob {knob} run')
     
-    @decorator_cal_in_thread
+    @decorator_call_in_thread
     def callback_knob_iweld(self, chanel):
         stat_system = ModbusConnect().read_status_system()  #read status system
         if stat_system['stat_IWELD'] == 1: # ibomb - on
@@ -226,8 +222,44 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
         GPIO.add_event_detect(self.KN_I_WELD, GPIO.FALLING, bouncetime=300,
                                 callback=self.callback_knob_iweld)
         print(f'event knob {self.KN_I_WELD} run')
-    
+            
+    def run_system_on_signal(self):
+        '''    Входной сигнал ON_WELD:
+            фронт из 1 в 0 – команда контроллеру на включение тока сварки,
+            фронт из 0 в 1 – команда контроллеру на выключение тока сварки;
+        '''
+        GPIO.add_event_detect(self.ON_WELD, GPIO.BOTH, 
+                                callback=self.callback_ON_WELD, bouncetime=100)
+        print('event ON_WELD run')
 
+        '''     Входной сигнал ON_UACC:
+            фронт из 1 в 0 – команда контроллеру на включение источника ускоряющего напряжения, затем команда контроллеру на включение тока бомбардировки,
+            фронт из 0 в 1 – команда контроллеру на выключение тока бомбардировки, затем команда контроллеру на выключение источника ускоряющего напряжения;
+        '''
+        GPIO.add_event_detect(self.ON_UACC, GPIO.BOTH, 
+                                callback=self.callback_ON_UACC, bouncetime=100)
+        print('event ON_UACC run')
+
+    def run_system_on_knob(self): # btn = [self.KN_UACC, self.KN_I_BOMB]
+        '''
+        Bходной сигнал KN_ON_OFF_UACC:
+            фронт из 1 в 0 – команда контроллеру на включение источника ускоряющего напряжения, при текущем статусе «Выкл»; на выключение при статусе «Вкл»;
+        Входной сигнал KN_ON_OFF_I_BOMB:
+            фронт из 1 в 0 – команда контроллеру на включение тока бомбардировки при текущем статусе «Выкл»; на выключение при статусе «Вкл»;
+        Входной сигнал KN_ON_OFF_I_WELD:
+            фронт из 1 в 0 – команда контроллеру на включение тока сварки при текущем статусе «Выкл», на выключение при статусе «Вкл»;
+
+        '''
+        for knob in self.pins_knob[:2]:
+            GPIO.add_event_detect(knob, GPIO.FALLING, bouncetime=300,
+                                callback=self.callback_knob)
+            print(f'event knob {knob} runed')
+    
+    def remove_system_on_knob(self):
+        for knob in self.pins_knob:
+            GPIO.remove_event_detect(knob)
+            print(f'event knob {knob} stoped')
+    
 if __name__ == "__main__":
     gpio = PinIO(GPIO,)
     mm = ModbusConnect()
@@ -243,7 +275,7 @@ if __name__ == "__main__":
 
     gpio.run_system_on_signal()
     gpio.run_system_on_knob()
-    gpio.run_knob_iweld()
+    #gpio.run_knob_iweld()
     try:
         n=0
         while True:

@@ -5,21 +5,17 @@ import time
 from tkinter import *
 import RPi.GPIO as GPIO
 import minimalmodbus
-#import asyncio
-import threading
-from multiprocessing import Process
-
-sys.path.append(['/home/pi/spreli/remote_control',
-                '/home/pi/spreli/remote_control/modules'])
+#import threading
 
 from modules.mask_logging import *
-
 from modules.display_GUI import MainWindow
 from modules.in_out_buttons import PinIO
 from modules.i2c_bus import DACModule, ExtSwitcher
 from modules.modbus485_mm import ModbusConnect
 from modules.focusing_config import SettFOC
 
+sys.path.append(['/home/pi/spreli/remote_control',
+                '/home/pi/spreli/remote_control/modules'])
 
 def change_use_chanel(i:bool):
     """
@@ -31,7 +27,6 @@ def change_use_chanel(i:bool):
     connect_mb.write_one_register(118,i)  # i weld
     connect_mb.write_one_register(116,i)  # uacc
     connect_mb.write_one_register(122,i) # i bomb
-
 
 def set_start_system(appl, connect, swiweld, dac, sfoc):  
     # начальные уставки системы при запуске
@@ -60,7 +55,7 @@ def set_start_system(appl, connect, swiweld, dac, sfoc):
 
 def thread_gpio():
     gpio.run_system_on_signal() # listen on_uacc and on_weld
-    gpio.run_system_on_knob()   # listen knobs
+    #gpio.run_system_on_knob()   # listen knobs
 
 def thread_view(application, gpio, start_iweld, system_parameters):
     print('start "change_all_display"')
@@ -88,32 +83,28 @@ def main_connect_to_system(appl, connect, swiweld, dac, sfoc):
         print(f'system_parameters:{system_parameters} \nI weld: {start_iweld}')
         
         #GIL
-        '''
+        #'''
         gpio.run_system_on_signal() # listen on_uacc and on_weld
         gpio.run_system_on_knob()   # listen knobs
+        gpio.run_knob_iweld()       # listen knob i_weld
         application.change_all_display(gpio, start_iweld, system_parameters)
-        '''
+        #'''
         #Thread
-        
-        run1 = threading.Thread(target=gpio.run_system_on_signal)
-        run2 = threading.Thread(target=gpio.run_system_on_knob)
+        '''
+        run1 = threading.Thread(target=gpio.run_system_on_signal, daemon=True)
+        run2 = threading.Thread(target=gpio.run_system_on_knob,daemon=True)
         run3 = threading.Thread(target=application.change_all_display,
-                                    args=(gpio, start_iweld, system_parameters))
-        run4 = threading.Thread(target=gpio.run_knob_iweld)
-        
-        run4.daemon = True
-        run1.daemon = True
-        run2.daemon = True
-        run3.daemon = True
-        
+                                    args=(gpio, start_iweld, system_parameters),daemon=True)
+        run4 = threading.Thread(target=gpio.run_knob_iwweld,daemon=True)
         run1.start()
         run2.start()
         run3.start()
         run4.start()
+        '''
        
     except Exception as e:
-        print('Error in "conect to system":', e)
-        error_log(f'Error in "conect to system": {e}')
+        print('Error in "main conect to system":', e)
+        error_log(f'Error in "main conect to system": {e}')
         time.sleep(0.05)
         main_connect_to_system(appl, connect, swiweld, dac, sfoc)
     
@@ -134,8 +125,7 @@ if __name__ == "__main__":
     info_log(f'{gpio}')
     
     root = Tk()
-    #root.geometry("850x500+50+50")          # поместить окно в точку с координатам 100,100 и установить размер в 810x450
-    root.attributes('-fullscreen', True)    #на весь экраna
+    #root.attributes('-fullscreen', True)    #на весь экраna
     root.config(cursor='none')              # скрыть курсор
     application = MainWindow(root)
     application.mGrid()
