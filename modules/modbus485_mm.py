@@ -12,10 +12,10 @@ def decorator_reconnect_for_exeption(function_):
     def func_wrapper(self,*args,**kwargs):
         try:
             return function_(self,*args,**kwargs)            
-        except Exception as e: #IOError
-            print (f'Error in {function_.__name__}: {e}')
-            info_log(f'Error in {function_.__name__}: {e}')
-            time.sleep(0.05)           # time modbus connection = 0.014/0.017 s
+        except IOError as ioe: 
+            print (f'Error in {function_.__name__}: {ioe}')
+            info_log(f'Error in {function_.__name__}: {ioe}')
+            time.sleep(0.05)           # time modbus connection = 0.014/0.019 s
             print('try reconect...')            
             return func_wrapper(self,*args,**kwargs)
             info_log('reconnect')
@@ -164,7 +164,7 @@ class ModbusConnect():
             print(f'OK-{register_} - writed {value_}' )
             info_log(f'{register_} = writed {value_}')     
         
-    @decorator_reconnect_for_exeption
+    #@decorator_reconnect_for_exeption
     def  read_all_parameters(self)->dict:
         
         unsigned_all_param = self.instrument.read_registers(registeraddress=0,
@@ -219,10 +219,11 @@ if __name__ == "__main__":
     try:        
         con_.check_connect()
         print(con_.instrument.serial)
-        
+
         all_param = con_.read_all_parameters()
+
         stat_syst = con_.read_status_system()
-        
+
         print('\tall  parameters: \n', )
         pprint(all_param)
         
@@ -236,14 +237,13 @@ if __name__ == "__main__":
         
         ##pprint(con_.transform_parameters_to_str(all_param))
         
-        '''
         mall_param = con_.instrument.read_registers(registeraddress=0,
                                                         number_of_registers=25, 
                                                         functioncode=4)
         print(mall_param)
         print(mall_param[0])
         pprint(con_.read_all_parameters())
-        '''
+
     except Exception as e:
         print(e)        
     finally:

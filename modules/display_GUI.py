@@ -33,7 +33,7 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         self.width_displ = 8                          # ширина диспелйчика
         self.width_displ_set = 8
         self.displ_fg = 'lime'                        # цвет цифер на диспл
-        self.time_total_update = 500                  # ,ms - частота запроса параметров системы
+        self.time_total_update = 800                  # ,ms - частота запроса параметров системы
         
         self.initUI()                                 # виджеты
         
@@ -326,47 +326,6 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
             self.fild_indicator_WC.create_oval(15,5,55,45,outline="black",
                                 width=1, fill="white")
     
-    def change_all_display(self, gpio, startiweld, system_parameters):
-        # read current parameters
-        system_parameters = ModbusConnect().read_all_parameters()
-
-        if isinstance(system_parameters, dict):            
-            status_system = ModbusConnect().parsing_status_system(system_parameters['status_system'])
-            
-            self.set_parameters(system_parameters) 
-            self.set_indicator(status_system)
-            
-            #self.set_progressbar(startiweld)
-            iweld=ExtSwitcher().value_iweld()
-            if iweld!=startiweld:
-                self.progress_bar['value'] = iweld
-                startiweld = iweld
-                ModbusConnect().write_one_register(
-                                    register_=ModbusConnect().set_points['set_iweld'][0],
-                                    value_=iweld,
-                                    degree_=ModbusConnect().set_points['set_iweld'][1])
-            else:
-                pass
-
-            gpio.set_outside_knob(status_system)                
-            gpio.set_output_VD(status_system, 
-                                value_ibomb=system_parameters['I_BOMB'],
-                                setted_ibomb=system_parameters['sets_IBOMB']) #register
-                               
-        else:
-            print('____________________________________________')
-            #self.label_title.config(text='-SPRELI PARAMETERS- status: disconnect')
-            #self.indicator_error['bg'] = 'red'
-            self.indicator_error['text']='ERR: NC'
-            self.master.update()
-            print('error in change_all_parameter', system_parameters)
-            error_log(f'error in change_all_display:{system_parameters}')
-                   
-        self.master.update_idletasks()
-        self.master.after(self.time_total_update, 
-                        self.change_all_display, 
-                        gpio, startiweld, system_parameters)
-
     def disconnect(self, master):
         ModbusConnect().close_connect()
         print('disconnect')
@@ -635,6 +594,7 @@ def open_mainWindow():
     
     root.mainloop()
    
+
 
 
 if __name__ == '__main__':
