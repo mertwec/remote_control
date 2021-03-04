@@ -1,5 +1,6 @@
 import time
 import sys
+import random as rd
 from pprint import pprint
 
 import minimalmodbus as mm
@@ -15,7 +16,7 @@ def decorator_reconnect_for_exeption(function_):
         except IOError as ioe: 
             print (f'Error in {function_.__name__}: {ioe}')
             info_log(f'Error in {function_.__name__}: {ioe}')
-            time.sleep(0.05)           # time modbus connection = 0.014/0.019 s
+            time.sleep(round(rd.triangular(0.05,0.1),3))      # time modbus connection = 0.014/0.019 s
             print('try reconect...')            
             return func_wrapper(self,*args,**kwargs)
             info_log('reconnect')

@@ -9,14 +9,16 @@ import minimalmodbus
 
 from modules.mask_logging import *
 from modules.display_GUI import MainWindow
-from modules.in_out_buttons import PinIO, check_system_knobs #check_system_knobs -- переменная служащая для определения включать или нет кнопки на пульте
+from modules.in_out_buttons import PinIO, check_system_knobs
+#check_system_knobs -- переменная служащая для определения включать или нет кнопки на пульте
+
 from modules.i2c_bus import DACModule, ExtSwitcher
 from modules.modbus485_mm import ModbusConnect
 from modules.focusing_config import SettFOC
-
+'''
 sys.path.append(['/home/pi/spreli/remote_control',
                 '/home/pi/spreli/remote_control/modules'])
-
+'''
 def change_use_chanel(i:bool):
     """
     воспомогательная ф-ция -- задаётся внешнее или внутреннее чтение уставок
@@ -55,45 +57,47 @@ def set_start_system(appl, connect, swiweld, dac, sfoc):
 
 def update_all_display(appl, gpio, connect_mb, startiweld, system_parameters):
     # read current parameters
-    system_parameters = connect_mb.read_all_parameters()
-    if isinstance(system_parameters, dict):            
-        status_system = connect_mb.parsing_status_system(system_parameters['status_system'])
-        iweld=ExtSwitcher().value_iweld()
-        
-        appl.set_parameters(system_parameters) 
-        appl.set_indicator(status_system)
-        #self.set_progressbar(startiweld)
-        if iweld!=startiweld:
-            appl.progress_bar['value'] = iweld
-            startiweld = iweld
-            connect_mb.write_one_register(
-                                register_=connect_mb.set_points['set_iweld'][0],
-                                value_=iweld,
-                                degree_=connect_mb.set_points['set_iweld'][1])
-        gpio.read_outside_knob(status_system)                
-        gpio.set_output_VD(status_system, 
-                            value_ibomb=system_parameters['I_BOMB'],
-                            setted_ibomb=system_parameters['sets_IBOMB']) #register
-                           
-    else:
-        print('____________________________________________')
-        #self.label_title.config(text='-SPRELI PARAMETERS- status: disconnect')
-        #self.indicator_error['bg'] = 'red'
-        appl.indicator_error['text']='ERR: NC'
-        appl.master.update()
-        print(f'error in {update_all_display.__name__}: {system_parameters}')
-        error_log(f'error in {update_all_display.__name__}: {system_parameters}')
-               
-    appl.master.update_idletasks()
+    try:            
+        system_parameters = connect_mb.read_all_parameters()
+        if isinstance(system_parameters, dict):            
+            status_system = connect_mb.parsing_status_system(system_parameters['status_system'])
+            iweld=ExtSwitcher().value_iweld()        
+            appl.set_parameters(system_parameters) 
+            appl.set_indicator(status_system)
+            #self.set_progressbar(startiweld)
+            if iweld!=startiweld:
+                appl.progress_bar['value'] = iweld
+                startiweld = iweld
 
-    appl.master.after(appl.time_total_update, 
-                    update_all_display, 
-                    appl, gpio,connect_mb, startiweld, system_parameters)
-
+                connect_mb.write_one_register(
+                                    register_=connect_mb.set_points['set_iweld'][0],
+                                    value_=iweld,
+                                    degree_=connect_mb.set_points['set_iweld'][1])
+            
+            gpio.read_outside_knob(status_system)                
+            gpio.set_output_VD(status_system, 
+                                value_ibomb=system_parameters['I_BOMB'],
+                                setted_ibomb=system_parameters['sets_IBOMB']) #register
+        else:
+            print('____________________________________________')
+            appl.master.update()
+            print(f'error in {update_all_display.__name__}: {system_parameters}')
+            error_log(f'error in {update_all_display.__name__}: {system_parameters}')
+                   
+        appl.master.update_idletasks()
+        appl.master.after(appl.time_total_update, 
+                        update_all_display, 
+                        appl, gpio, connect_mb, startiweld, system_parameters)
+    except Exception as e:
+        print (f'error in UPDATE_all: {e}')
+        time.sleep(0.1)
+        appl.master.after(appl.time_total_update, 
+                        update_all_display, 
+                        appl, gpio, connect_mb, startiweld, system_parameters)
+                        
 def main_connect_to_system(appl, gpio, connect_mb, swiweld, dac, sfoc):
     '''init: проверка связи. конект через modbus'''
     # проверка связи с контроллером
-
     try:
         conn = connect_mb.check_connect()
         info_log(f'version: {conn}')
@@ -110,8 +114,7 @@ def main_connect_to_system(appl, gpio, connect_mb, swiweld, dac, sfoc):
         #GIL
         #'''
         gpio.run_system_on_signal() # listen on_uacc and on_weld
-        gpio.run_system_on_knob()   # listen knobs
-        #gpio.run_knob_iweld()       # listen knob i_weld
+        gpio.run_system_on_knob()   # listen knob
         
         update_all_display(application, gpio, connect_mb, start_iweld, system_parameters)
 
@@ -150,7 +153,7 @@ if __name__ == "__main__":
     info_log(f'{gpio}')
     
     root = Tk()
-    #root.attributes('-fullscreen', True)    # на весь экраna
+    root.attributes('-fullscreen', True)    # на весь экраna
     root.config(cursor='none')              # скрыть курсор
     application = MainWindow(root)
     application.mGrid()    

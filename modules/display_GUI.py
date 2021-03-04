@@ -47,7 +47,7 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         
     def initUI_label_displ(self):
         self.master.title("-=SPRELI PARAMETERS=-") # основное окно
-        self.label_title = Label(self.master, text=('-SPRELI PARAMETERS- status read'),
+        self.label_title = Label(self.master, text=('-SPRELI PARAMETERS-'),
                                 font=self.font_labels,bg=self.main_bg)
             # labels and display
         self.label_text_U_ACC = Label(self.master,text=('UACC,kV'),
@@ -283,7 +283,7 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         
         system_parameters = ModbusConnect().transform_parameters_to_str(system_parameters)
         
-        self.label_title.config(text='-SPRELI PARAMETERS- status: connected')
+        self.label_title.config(text='-SPRELI PARAMETERS-')
         self.label_displ_U_ACC.config(text=system_parameters['U_ACC'])        
         self.label_displ_U_POW.config(text=system_parameters['U_POWER'])
         self.label_displ_U_LOCK.config(text=system_parameters['U_LOCK'])
