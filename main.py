@@ -63,12 +63,12 @@ def update_all_display(appl, gpio, connect_mb, startiweld, system_parameters):
             status_system = connect_mb.parsing_status_system(system_parameters['status_system'])
             iweld=ExtSwitcher().value_iweld()        
             appl.set_parameters(system_parameters) 
-            appl.set_indicator(status_system)
-            #self.set_progressbar(startiweld)
+            
+            appl.set_indicator(status_system, system_parameters['Error_current'])
+
             if iweld!=startiweld:
                 appl.progress_bar['value'] = iweld
                 startiweld = iweld
-
                 connect_mb.write_one_register(
                                     register_=connect_mb.set_points['set_iweld'][0],
                                     value_=iweld,
@@ -88,8 +88,8 @@ def update_all_display(appl, gpio, connect_mb, startiweld, system_parameters):
         appl.master.after(appl.time_total_update, 
                         update_all_display, 
                         appl, gpio, connect_mb, startiweld, system_parameters)
-    except Exception as e:
-        print (f'error in UPDATE_all: {e}')
+    except IOError as ioe:
+        print (f'IO_error in UPDATE_all: {ioe}')
         time.sleep(0.1)
         appl.master.after(appl.time_total_update, 
                         update_all_display, 
@@ -110,6 +110,8 @@ def main_connect_to_system(appl, gpio, connect_mb, swiweld, dac, sfoc):
             
         info_log(f'start parameters: {system_parameters}')   
         print(f'system_parameters:{system_parameters} \nI weld: {start_iweld}')
+        info_log(f'status system: {status_system}')
+        print(f'status system: {status_system}')
         
         #GIL
         #'''
@@ -130,13 +132,17 @@ def main_connect_to_system(appl, gpio, connect_mb, swiweld, dac, sfoc):
         run2.start()
         run3.start()
         run4.start()
-        '''
-    except Exception as e:
-        print('Error in "main conect to system":', e)
-        error_log(f'Error in "main conect to system": {e}')
+        '''    
+    except IOError as ioe:
+        print('ioError in "main conect to system":', ioe)
+        error_log(f'ioError in "main conect to system": {ioe}')
         time.sleep(0.05)
-        #main_connect_to_system(appl, gpio, connect_mb, swiweld, dac, sfoc)    
-        
+        main_connect_to_system(appl, gpio, connect_mb, swiweld, dac, sfoc)    
+
+    except Exception as e:
+        print('Uncnown Error in "main conect to system":', e)
+        error_log(f'Uncnown Error in "main conect to system": {e}')
+    
 if __name__ == "__main__":
     # создание экземпляров
     connect_mb = ModbusConnect()

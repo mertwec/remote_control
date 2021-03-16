@@ -28,12 +28,12 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         self.master.configure(background = self.main_bg)
         
         self.font_labels = ("FreeSans", 13)           # шрифт подписей
-        self.font_displ = ('DS-Digital', 33)          # шрифт на дисплейчике
-        self.font_displ_set = ('DS-Digital', 26)
+        self.font_displ = ('My Font', 33)          # шрифт на дисплейчике
+        self.font_displ_set = ('My Font', 26)
         self.width_displ = 8                          # ширина диспелйчика
         self.width_displ_set = 8
         self.displ_fg = 'lime'                        # цвет цифер на диспл
-        self.time_total_update = 800                  # ,ms - частота запроса параметров системы
+        self.time_total_update = 500                  # ,ms - частота запроса параметров системы
         
         self.initUI()                                 # виджеты
         
@@ -47,8 +47,14 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         
     def initUI_label_displ(self):
         self.master.title("-=SPRELI PARAMETERS=-") # основное окно
+        
+        self.label_splitter_top = Label(self.master, text=('_'*76),anchor=S,
+                                 font=self.font_labels, bg=self.main_bg)
         self.label_title = Label(self.master, text=('-SPRELI PARAMETERS-'),
                                 font=self.font_labels,bg=self.main_bg)
+        self.label_time_cathode = Label(self.master, text=('Time cathode --d --:--:--'),
+                                font=self.font_labels, bg=self.main_bg)
+        
             # labels and display
         self.label_text_U_ACC = Label(self.master,text=('UACC,kV'),
                                 font=self.font_labels, bg=self.main_bg )
@@ -56,19 +62,11 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
                                 font=self.font_displ, width=self.width_displ, justify=LEFT,
                                 fg=self.displ_fg, bg='black',)
 
-        self.label_text_U_POW = Label(self.master,text=('Power Volt,V'),
+        self.label_text_U_POW = Label(self.master,text=('Pressure,kPa'),
                                 font=self.font_labels, bg=self.main_bg)
         self.label_displ_U_POW = Label(self.master,text=('----'), anchor=E,
                                  font=self.font_displ,width=self.width_displ, justify=LEFT,
                                  fg=self.displ_fg, bg='black')
-
-        ##############  ?????
-        self.label_text_I_FOC = Label(self.master,text=('Focusing Cur,mA'),
-                                font=self.font_labels, bg=self.main_bg )
-        self.label_displ_I_FOC = Label(self.master,text=('----'), anchor=E,
-                                 font=self.font_displ,width=self.width_displ, justify=LEFT,
-                                 fg=self.displ_fg, bg='black')
-        ##############
 
         self.label_text_U_LOCK = Label(self.master,text=('Bias Volt,V'),
                                  font=self.font_labels, bg=self.main_bg )
@@ -147,7 +145,7 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
                                     bordercolor='black',
                                     thickness=55,)
         
-        self.label_text_pb = Label(self.master,text=('Welding Curent,mA'),
+        self.label_text_pb = Label(self.master,text=('Welding Cur,mA'),
                                 font=self.font_labels, bg=self.main_bg )
         
         self.progress_bar = ttk.Progressbar(self.master, maximum = 250,
@@ -203,75 +201,74 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
 
     # widget layout
     def mGrid(self):
-        self.label_title.grid(row=0,column=0,columnspan=2,sticky=W,padx=25, pady=7)
+        pad_y=1
+        pad_x=9
+        self.label_splitter_top.grid(row=0, column=0, columnspan=4,)
+        self.label_title.grid(row=0,column=0, columnspan=2, sticky=W, padx=25)        
+        self.label_time_cathode.grid(row=1, column=0, columnspan=2, sticky=W, ipadx=pad_x,)
+        
         # button
-        self.button_quit.grid(row=0,column=2, sticky=S)
-        self.button_focus.grid(row=0, column=3, sticky=S)
+        self.button_quit.grid(row=1,column=2, sticky=S)
+        self.button_focus.grid(row=1, column=3, sticky=S)
         # display
-        self.label_text_U_ACC.grid(row=1, column=0,sticky=W, padx=7, pady=2)
-        self.label_displ_U_ACC.grid(row=2, column=0,sticky='NW',padx=7, pady=5)
+        self.label_text_U_ACC.grid(row=2, column=0,sticky=W, padx=pad_x, pady=pad_y)
+        self.label_displ_U_ACC.grid(row=3, column=0,sticky='NW',padx=pad_x, pady=4)
 
-        self.label_text_U_POW.grid(row=3, column=0,sticky=W, padx=7, pady=2)
-        self.label_displ_U_POW.grid(row=4, column=0,sticky='NW',padx=7, pady=4)
+        self.label_text_U_POW.grid(row=4, column=0,sticky=W, padx=pad_x, pady=pad_y)
+        self.label_displ_U_POW.grid(row=5, column=0,sticky='NW',padx=pad_x, pady=4)
 
-        self.label_text_U_LOCK.grid(row=5, column=0,sticky=W, padx=7, pady=2)
-        self.label_displ_U_LOCK.grid(row=6, column=0,sticky='NW',padx=7, pady=4)
+        self.label_text_U_LOCK.grid(row=6, column=0,sticky=W, padx=pad_x, pady=pad_y)
+        self.label_displ_U_LOCK.grid(row=7, column=0,sticky='NW',padx=pad_x, pady=4)
 
-        self.label_text_U_BOMB.grid(row=1, column=1,sticky=W, padx=7, pady=2)
-        self.label_displ_U_BOMB.grid(row=2, column=1,sticky='NW',padx=7, pady=4)
+        self.label_text_U_BOMB.grid(row=2, column=1,sticky=W, padx=pad_x, pady=pad_y)
+        self.label_displ_U_BOMB.grid(row=3, column=1,sticky='NW',padx=pad_x, pady=4)
 
-        self.label_text_I_BOMB.grid(row=3, column=1,sticky=W, padx=7, pady=2)
-        self.label_displ_I_BOMB.grid(row=4, column=1,sticky='NW',padx=7, pady=4)
+        self.label_text_I_BOMB.grid(row=4, column=1,sticky=W, padx=pad_x, pady=pad_y)
+        self.label_displ_I_BOMB.grid(row=5, column=1,sticky='NW',padx=pad_x, pady=4)
 
-        self.label_text_I_FIL.grid(row=5, column=1, sticky=W, padx=7, pady=2)
-        self.label_displ_I_FIL.grid(row=6, column=1, sticky='NW',padx=7, pady=4)
+        self.label_text_I_FIL.grid(row=6, column=1, sticky=W, padx=pad_x, pady=pad_y)
+        self.label_displ_I_FIL.grid(row=7, column=1, sticky='NW',padx=pad_x, pady=4)
 
-        self.label_text_U_WEHNELT.grid(row=1, column=2, sticky=W, padx=7, pady=2)
-        self.label_displ_U_WEHNELT.grid(row=2, column=2, sticky='NW',padx=7, pady=4)
+        self.label_text_U_WEHNELT.grid(row=2, column=2, sticky=W, padx=pad_x, pady=pad_y)
+        self.label_displ_U_WEHNELT.grid(row=3, column=2, sticky='NW',padx=pad_x, pady=4)
 
-        self.label_text_AUX.grid(row=3, column=2, sticky=W, padx=7, pady=2)
-        self.label_displ_AUX.grid(row=4, column=2,sticky='NW',padx=7, pady=4)
+        self.label_text_AUX.grid(row=4, column=2, sticky=W, padx=pad_x, pady=pad_y)
+        self.label_displ_AUX.grid(row=5, column=2,sticky='NW',padx=pad_x, pady=4)
 
-        self.label_text_TEMP.grid(row=5, column=2, sticky=W, padx=7, pady=2)
-        self.label_displ_TEMP.grid(row=6, column=2, sticky='NW', padx=7, pady=4)
+        self.label_text_TEMP.grid(row=6, column=2, sticky=W, padx=pad_x, pady=pad_y)
+        self.label_displ_TEMP.grid(row=7, column=2, sticky='NW', padx=pad_x, pady=4)
 
-        self.label_displ_I_WELD.grid(row=2, column=3, sticky='NW', padx=7, pady=4)
+        self.label_displ_I_WELD.grid(row=3, column=3, sticky='NW', padx=pad_x, pady=4)
 
         # display set labels
-        #self.label_text_set.grid(row=7, column=0, sticky=W, padx=27, pady=3)
         
-        self.label_text_setUACC.grid(row=7, column=0, sticky='SE', padx=7, pady=2)
-        self.label_displ_setUACC.grid(row=8, column=0, sticky='SE', padx=7, pady=1)
+        self.label_text_setUACC.grid(row=8, column=0, sticky='SE', padx=pad_x,)
+        self.label_displ_setUACC.grid(row=9, column=0, sticky='SE', padx=pad_x, pady=1)
         
-        self.label_text_setIBOMB.grid(row=7, column=1, sticky='SE', padx=7, pady=2)
-        self.label_displ_setIBOMB.grid(row=8, column=1, sticky='SE', padx=7, pady=1)
+        self.label_text_setIBOMB.grid(row=8, column=1, sticky='SE', padx=pad_x,)
+        self.label_displ_setIBOMB.grid(row=9, column=1, sticky='SE', padx=pad_x, pady=1)
         
-        self.label_text_setIWELD.grid(row=7, column=2, sticky='SE', padx=7, pady=2)
-        self.label_displ_setIWELD.grid(row=8, column=2, sticky='SE', padx=7, pady=1)
+        self.label_text_setIWELD.grid(row=8, column=2, sticky='SE', padx=pad_x,)
+        self.label_displ_setIWELD.grid(row=9, column=2, sticky='SE', padx=pad_x, pady=1)
 
         # progress bar
-        self.label_text_pb.grid(row=1, column=3, sticky=S, padx=7, pady=2)
-        self.progress_bar.grid(row=3,column=3, rowspan=6, pady=3)
-        
-        
-           # inform statistic
-        #self.label_text_inform.grid(row=7, column=0, sticky=W, padx=7, pady=3)
-        #self.text_inform.grid(row=8, column=0 ,columnspan=3, sticky=W,
-        #                    padx=7, pady=3)
-        
+        self.label_text_pb.grid(row=2, column=3, sticky=S, padx=pad_x, pady=pad_y)
+        self.progress_bar.grid(row=4, column=3, rowspan=6, pady=3)
+
         # indicator
-        self.label_splitter.grid(row=9, column=0,columnspan=4,)
-        self.label_error.grid(row=11, column=0, sticky=S, padx=7, pady=3)
-        self.indicator_error.grid(row=10, column=0,padx=7, pady=3)
+        self.label_splitter.grid(row=10, column=0, columnspan=4, pady=0)
+        
+        self.label_error.grid(row=12, column=0, sticky=S, padx=pad_x, pady=3)
+        self.indicator_error.grid(row=11, column=0, padx=pad_x, pady=1)
 
-        self.label_indicator_AW.grid(row=11, column=1,sticky=S,padx=7,pady=3)
-        self.fild_indicator_AW.grid(row=10,column=1,padx=7,pady=1)
+        self.label_indicator_AW.grid(row=12, column=1,sticky=S,padx=pad_x,pady=3)
+        self.fild_indicator_AW.grid(row=11,column=1, padx=pad_x,pady=1)
 
-        self.label_indicator_CH.grid(row=11, column=2,sticky=S, padx=7, pady=3)
-        self.fild_indicator_CH.grid(row=10, column=2,padx=7, pady=1)
+        self.label_indicator_CH.grid(row=12, column=2, sticky=S, padx=pad_x, pady=3)
+        self.fild_indicator_CH.grid(row=11, column=2, padx=pad_x, pady=1)
 
-        self.label_indicator_WC.grid(row=11, column=3,sticky=S, padx=7, pady=3)
-        self.fild_indicator_WC.grid(row=10, column=3, padx=7, pady=1)
+        self.label_indicator_WC.grid(row=12, column=3, sticky=S, padx=7, pady=3)
+        self.fild_indicator_WC.grid(row=11, column=3, padx=pad_x, pady=1)
 
     def show_message(self, mess):
         messagebox.showerror("error", mess,)# parent=Toplevel())
@@ -281,11 +278,14 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         self.label_displ_setIWELD.config(text=system_parameters['sets_IWELD'])
         self.label_displ_setIBOMB.config(text=system_parameters['sets_IBOMB'])
         
+        time_cathode=ModbusConnect().operating_time_of_cathode(system_parameters['time_cathode'])
+        self.label_time_cathode.config(text=f'Time cathode {time_cathode}')       
+        
         system_parameters = ModbusConnect().transform_parameters_to_str(system_parameters)
         
-        self.label_title.config(text='-SPRELI PARAMETERS-')
+        self.label_title.config(text='SPRELI_PARAMETERS')
         self.label_displ_U_ACC.config(text=system_parameters['U_ACC'])        
-        self.label_displ_U_POW.config(text=system_parameters['U_POWER'])
+        self.label_displ_U_POW.config(text=system_parameters['PRESSURE'])
         self.label_displ_U_LOCK.config(text=system_parameters['U_LOCK'])
         self.label_displ_U_BOMB.config(text=system_parameters['U_BOMB'])
         self.label_displ_I_BOMB.config(text=system_parameters['I_BOMB'])
@@ -295,16 +295,16 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         self.label_displ_TEMP.config(text=system_parameters['TEMP'])
         self.label_displ_I_WELD.config(text=system_parameters['I_WELD'])
 
-    def set_indicator(self,stat_system):        
-        if stat_system['stat_failure']==1:
-            valueparam = ModbusConnect().read_one_register(register_= 1, functioncode_=4) # read code of error
-            if valueparam == 0:
-                self.indicator_error.config(text=f'ERR: {valueparam}',bg = 'green')
+    def set_indicator(self,stat_system, alarm_code=30):        
+        if stat_system['stat_failure']:
+            #alarm_code = ModbusConnect().read_one_register(register_= 1, functioncode_=4) # read code of error
+            if alarm_code:
+                self.indicator_error.config(text=f'ERR: {alarm_code}',bg = 'red')                
             else:
-                self.indicator_error.config(text=f'ERR: {valueparam}',bg = 'red')
+                self.indicator_error.config(text=f'ERR: {alarm_code}',bg = 'green')            
         else:
-            self.indicator_error.config(text=f'ERR: 00',bg = 'green')
-        
+            self.indicator_error.config(text=f'ERR: 00',bg = 'green') 
+                   
         if stat_system['stat_UACC']:
             self.fild_indicator_AW.create_oval(15,5,55,45,outline="black",        # 20,10,50,40,
                                 width=1, fill="red")
@@ -325,6 +325,7 @@ class MainWindow(ModbusConnect, DACModule, ExtSwitcher, SettFOC):
         else:
             self.fild_indicator_WC.create_oval(15,5,55,45,outline="black",
                                 width=1, fill="white")
+        
     
     def disconnect(self, master):
         ModbusConnect().close_connect()
@@ -353,7 +354,7 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
         
     def initUI_set_menu(self):
         #main title
-        self.master.title("-=SETTINGS=-") #  отображение в шапке окна основное окно
+        self.master.title("SETTINGS") #  отображение в шапке окна основное окно
         
         # entry settings
         self.label_uacc_current = Label(self.master, text=('setpoint U ACC,kV:'),
@@ -392,28 +393,28 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
 
 
         #buttons
-        self.button_add_uacc = Button(self.master,text='+1kV',width=3,height=2,
+        self.button_add_uacc = Button(self.master, text='+1,kV', width=3, height=2,
                             command=lambda:self.change_ibomb_uacc('+',step=1))
-        self.button_sub_uacc = Button(self.master,text='-1kV',width=3,height=2,
+        self.button_sub_uacc = Button(self.master, text='-1,kV',width=3, height=2,
                             command=lambda:self.change_ibomb_uacc('-',step=1))
                             
-        self.button_add_ibomb = Button(self.master,text='+2mA',width=3,height=2,
+        self.button_add_ibomb = Button(self.master, text='+2,mA', width=3, height=2,
                             command=lambda:self.change_ibomb_uacc('+',step=2))
-        self.button_sub_ibomb = Button(self.master,text='-2mA',width=3,height=2,
+        self.button_sub_ibomb = Button(self.master, text='-2,mA', width=3, height=2,
                             command=lambda:self.change_ibomb_uacc('-',step=2))
         
-        self.button_add_ifoc = Button(self.master,text='+4mA',width=3,height=2,
+        self.button_add_ifoc = Button(self.master, text='+4,mA' ,width=3, height=2,
                             command=lambda:self.change_i_focus('+')) 
-        self.button_sub_ifoc = Button(self.master,text='-4mA',width=3,height=2,
+        self.button_sub_ifoc = Button(self.master, text='-4,mA', width=3, height=2,
                             command=lambda:self.change_i_focus('-'))
-
-        self.button_write = Button(self.master,text='write',width=12,height=1,
+        self.button_time_cat = Button(self.master, text='Reset time\ncathode', width=12, height=2,
+                            command = self.reset_time_cathode)        
+        self.button_write = Button(self.master, text='Write', width=12, height=2,
                             command=self.write_from_entry_fields)
-        self.button_quit = Button(self.master,text='quit',width=12,height=1,
+        self.button_quit = Button(self.master, text='Quit', width=12, height=2,
                             command=lambda:self.disconnect(self.master))
 
     def mGrid_set_menu(self):
-
         #label entry
         
         self.label_uacc_current.grid(row=0, column=0, sticky=W, padx=15, pady=7)
@@ -450,8 +451,9 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
         self.button_add_ifoc.grid(row=2,column=3,sticky=W,padx=7, pady=7)
         self.button_sub_ifoc.grid(row=2,column=2,sticky=W,padx=7, pady=7)
         
-        self.button_write.grid(row=6,column=2,columnspan=2,sticky=W,padx=7, pady=7)
-        self.button_quit.grid(row=7,column=2,columnspan=2,sticky=W,padx=7, pady=7)
+        self.button_time_cat.grid(row=5, column=2, columnspan=2, sticky=W, padx=7, pady=7)
+        self.button_write.grid(row=6, column=2, columnspan=2, sticky=W, padx=7, pady=7)
+        self.button_quit.grid(row=7, column=2, columnspan=2, sticky=W, padx=7, pady=7)
 
     def set_entry_values(self, param:dict): # param -- read from config file ,path='modules\settings_focus.conf')
         self.entry_set_U_ACC.insert(0, self.U_ACC_setting)
@@ -523,6 +525,9 @@ class SetFocWindow(MainWindow):   # SettFOC, ModbusConnect):
                                     value_=self.U_ACC, 
                                     degree_=ModbusConnect().set_points['set_uacc'][1])
     
+    def reset_time_cathode(self):
+        ModbusConnect().write_execution_command(register_=10, value_=True)
+    
     def change_ibomb_uacc(self, sign, step):
         '''
         1=uass, kV
@@ -579,7 +584,7 @@ def open_setFocWindows():
     '''open windows setting focusing
     '''
     rootf = Tk()
-    rootf.geometry("550x410+25+25")   # поместить окно в точку с координатам 25,25 и установить размер в 810x370 
+    rootf.geometry("550x480+0+0")   # поместить окно в точку с координатам 25,25 и установить размер в 810x370 
     appl_foc = SetFocWindow(rootf)  # all start setting in __init__ 
     appl_foc.mGrid_set_menu()
     
@@ -587,14 +592,12 @@ def open_setFocWindows():
     
 def open_mainWindow():
     root = Tk()
-    root.geometry("800x500+25+25")      # поместить окно в точку с координатам 100,100 и установить размер в 810x450
+    root.geometry("800x480+25+25")      # поместить окно в точку с координатам 100,100 и установить размер в 810x450
     #root.attributes('-fullscreen', True)  #на весь экран
     appl = MainWindow(root)
     appl.mGrid()
     
     root.mainloop()
-   
-
 
 
 if __name__ == '__main__':

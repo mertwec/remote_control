@@ -2,7 +2,7 @@ import time
 import sys
 import random as rd
 from pprint import pprint
-
+from decimal import Decimal
 import minimalmodbus as mm
 import serial
 from mask_logging import *
@@ -63,6 +63,7 @@ class ModbusConnect():
         self.execution_commands = {'exec_U_ACC':(1,False),  #  param:(reg,default status)
                                     'exec_I_WELD':(2,False),
                                     'exec_I_BOMB':(3,False),}
+        self.registers_error_onoff = [29,37,45,53,61,69,77,85,93,101]
         
     def __str__(self):
         return (f'port = {self.instrument.serial.port},/nbaudrate = {self.instrument.serial.baudrate}')
@@ -75,19 +76,6 @@ class ModbusConnect():
                             functioncode=4)
         print(f'connected: version = {check_pass1} {check_pass2}')
         return (check_pass1,check_pass2)
-    
-    def parsing_status_system(self, bss:bin):        
-        #print(f'parsing stat syst:/n bss={bss}')
-        if len(bss[2:])<16:
-            mfullbss=('0'*(16-len(bss[2:]))+bss[2:])[::-1]      
-        else:
-            mfullbss=bss[2:][::-1]                                            
-        return {'stat_UACC':int(mfullbss[10]), #1 reg
-                'stat_IBOMB':int(mfullbss[11]), #3 reg
-                'stat_IWELD':int(mfullbss[12]), #2 reg
-                
-                'stat_failure':int(mfullbss[13]),
-                'stat_run':int(mfullbss[8])}
     
     @decorator_reconnect_for_exeption
     def read_status_system(self)->dict:
@@ -132,11 +120,11 @@ class ModbusConnect():
 			reg1 -- U_ACC
 			reg2 -- I_WELD
 			reg3 -- I_FIL
+            reg3 -- nullify operating time of cathode
         '''
         self.instrument.write_bit(registeraddress=register_,
                                     value=value_,                                   
-                                    functioncode=5,)
-                                    
+                                    functioncode=5,)                                    
         print(f'{register_} - writed = {value_}' )
         info_log(f'{register_} - writed = {value_}' )
 
@@ -166,8 +154,7 @@ class ModbusConnect():
             info_log(f'{register_} = writed {value_}')     
         
     #@decorator_reconnect_for_exeption
-    def  read_all_parameters(self)->dict:
-        
+    def  read_all_parameters(self)->dict:        
         unsigned_all_param = self.instrument.read_registers(registeraddress=0,
                                                     number_of_registers=25, 
                                                     functioncode=4)
@@ -176,6 +163,8 @@ class ModbusConnect():
 
         # преобразование всех чисел в знаковые (может быть отрицателен)
         #signed_all_param = [i-65536 if i>32767 else i for i in unsigned_all_param]  # если число больше 32767 то оно отрицательно
+        
+        # выводить 0 если отриательно
         unsigned_all_param_zero = [0 if i>32767 else i for i in unsigned_all_param]
         
         return {'U_ACC':round(unsigned_all_param_zero[3]*10**(-2),2),                    
@@ -187,7 +176,8 @@ class ModbusConnect():
                 'AUX':round(unsigned_all_param_zero[10]*10**-2, 2),
                 'U_WEHNELT':unsigned_all_param_zero[8],
                 'TEMP':unsigned_all_param[12],
-                'U_POWER':round(unsigned_all_param_zero[11]*10**-2,2),
+                'PRESSURE':unsigned_all_param_zero[11],
+                'U_POWER':round(unsigned_all_param_zero[11]*10**(-2),2),
                 
                 'Error_current':unsigned_all_param[1],
                 'Error_last':unsigned_all_param[2],
@@ -195,11 +185,24 @@ class ModbusConnect():
                 'sets_UACC':round(unsigned_all_param_zero[13]*10**(-2),2),
                 'sets_IWELD':round(unsigned_all_param_zero[14]*10**(-1),2),
                 'sets_IBOMB':round(unsigned_all_param_zero[16]*10**(-1),2),
-                
+                'time_cathode':{'dh':bin(unsigned_all_param[23]),
+                                'ms':bin(unsigned_all_param[24])
+                                },
                 'status_system':bin(unsigned_all_param[0]),
                 }
     
-    def transform_parameters_to_str(self, parameters:dict):
+    def onoff_protection(self, value=0): 
+        '''
+        0-off
+        1-on
+        '''
+        for reg in self.registers_error_onoff:
+            self.write_one_register(reg, value)
+        
+    
+    
+    @staticmethod
+    def transform_parameters_to_str(parameters:dict):
         if isinstance(parameters, dict):
             string_paramerters = {}
             for key, value in parameters.items():
@@ -210,6 +213,35 @@ class ModbusConnect():
             return string_paramerters 
         else: 
             return parameters # return IOError from 'read_all_parameters'
+    
+    @staticmethod
+    def operating_time_of_cathode(time_cath:dict):
+        for key,value in time_cath.items():
+            if len(value[2:]) != 16:
+                time_cath[key]='0b'+'0'*(16-len(value[2:]))+value[2:]
+        
+        dhms = (int(time_cath['dh'][:-8],2),        # days
+                int('0b'+time_cath['dh'][-8:],2),   # hours
+                int(time_cath['ms'][:-8],2),        # minutes
+                int('0b'+time_cath['ms'][-8:],2),   # seconds
+                )
+        # приведение времени к норм виду
+        str_dhms = ['0'+str(i) if len(str(i))==1 else str(i) for i in dhms]        
+        return f'{str_dhms[0]}d {str_dhms[1]}:{str_dhms[2]}:{str_dhms[3]}'
+    
+    @staticmethod
+    def parsing_status_system(bss:bin):        
+        #print(f'parsing stat syst:/n bss={bss}')
+        if len(bss[2:])<16:
+            mfullbss=('0'*(16-len(bss[2:]))+bss[2:])[::-1]      
+        else:
+            mfullbss=bss[2:][::-1]                                            
+        return {'stat_UACC':int(mfullbss[10]), #1 reg
+                'stat_IBOMB':int(mfullbss[11]), #3 reg
+                'stat_IWELD':int(mfullbss[12]), #2 reg
+                
+                'stat_failure':int(mfullbss[13]),
+                'stat_run':int(mfullbss[8])}
                 
     def close_connect(self):
         self.instrument.serial.close()
@@ -217,36 +249,33 @@ class ModbusConnect():
             
 if __name__ == "__main__":
     con_ = ModbusConnect()      
-    try:        
-        con_.check_connect()
-        print(con_.instrument.serial)
+       
+    con_.check_connect()
+    print(con_.instrument.serial)
+    
+    #con_.onoff_protection(value=0) # 1-on
+    
+    all_param = con_.read_all_parameters()
+    stat_syst = con_.read_status_system()
 
-        all_param = con_.read_all_parameters()
+    print('\tall  parameters: \n', )
+    pprint(all_param)
+    
+    #con_.write_execution_command(register_=1, value_=0) #uacc
+    #con_.write_execution_command(register_=2, value_=0) #iweld
+    #con_.write_execution_command(register_=3, value_=0) #ibomb
+    #time.sleep(0.1)
+    
+    print('\tstatus system:\n')
+    pprint(stat_syst)
+    
+    #pprint(con_.transform_parameters_to_str(all_param))
+    print(con_.operating_time_of_cathode(all_param['time_cathode']))
+    
+    mall_param = con_.instrument.read_registers(registeraddress=0,
+                                                    number_of_registers=25, 
+                                                    functioncode=4)
+    print(mall_param)
+    print(mall_param[0])
 
-        stat_syst = con_.read_status_system()
-
-        print('\tall  parameters: \n', )
-        pprint(all_param)
-        
-        con_.write_execution_command(register_=1, value_=0) #uacc
-        con_.write_execution_command(register_=2, value_=0) #iweld
-        con_.write_execution_command(register_=3, value_=0) #ibomb
-        time.sleep(0.1)
-        
-        print('\tstatus system:\n')
-        pprint(stat_syst)
-        
-        ##pprint(con_.transform_parameters_to_str(all_param))
-        
-        mall_param = con_.instrument.read_registers(registeraddress=0,
-                                                        number_of_registers=25, 
-                                                        functioncode=4)
-        print(mall_param)
-        print(mall_param[0])
-        pprint(con_.read_all_parameters())
-
-    except Exception as e:
-        print(e)        
-    finally:
-        con_.close_connect()
 

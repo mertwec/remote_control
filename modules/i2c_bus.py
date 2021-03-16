@@ -19,9 +19,11 @@ class DACModule(MainBus):
     def __init__(self, DEV_ADDR=(0x48, 0x49)):
         # Addres device = 0x48 or 0x49
         self.DAC_ADDR1=DEV_ADDR[0]
-        self.DAC_ADDR2=DEV_ADDR[1] # not use
+        self.DAC_ADDR2=DEV_ADDR[1] # not use set 10
         self.dac_ch = 0b1000000     # 0x40
-        #self.set_dac_in_null()
+        
+        self.write_byte_dac(ADDR=self.DAC_ADDR2, byte=1)
+        
         '''
         self.I_FOC = 0   # tок фокусировки, диапазон от 0 до 1000мА
         self.I_FOC_MIN = 0 #диапазон от 0 до 1000мА
@@ -31,17 +33,24 @@ class DACModule(MainBus):
         '''
         
     def __str__(self):
-        mess = f'PCF8591:/n --addres:{self.DAC_ADDR1}  and {self.DAC_ADDR2}'
-        return mess
+        message_= f'''PCF8591:
+        1DAC={self.DAC_ADDR1}:{self.read_byte_dac(self.DAC_ADDR1)}
+        2DAC={self.DAC_ADDR2}:{self.read_byte_dac(self.DAC_ADDR2)}'''
+        return message_
    
     def set_dac_in_null(self):
         self.write_byte_dac(ADDR=self.DAC_ADDR1,byte=0)
         self.write_byte_dac(ADDR=self.DAC_ADDR2,byte=0)
     
-    def write_byte_dac(self,byte,ADDR=0x48): 
+    def write_byte_dac(self, byte, ADDR=0x48): 
         """byte = 0 to 255 """
-        self.bus.write_byte_data(self.DAC_ADDR1, self.dac_ch, byte)
-        #self.bus.write_byte_data(self.DAC_ADDR2, self.dac_ch, byte)
+        self.bus.write_byte_data(ADDR, self.dac_ch, byte)
+    
+    def read_byte_dac(self, ADDR=0x48):
+        self.bus.read_byte(ADDR)
+        self.bus.read_byte(ADDR)
+        data = self.bus.read_byte(ADDR)
+        return data
 
 
 class ExtSwitcher(MainBus):
@@ -88,10 +97,11 @@ class ExtSwitcher(MainBus):
             self.value_iweld() 
 
 if __name__ == '__main__':
-
+    dacs = DACModule()
     exp = ExtSwitcher()
-    
+    '''
     while 1:
+        
         print(exp.read_switcher())
         part1 = exp.read_exp(exp.addr_exp1)
         part2 = exp.read_exp(exp.addr_exp2)
@@ -99,8 +109,8 @@ if __name__ == '__main__':
         print(f'p1-{exp.addr_exp1} = {part1}')
         print(f'p2-{exp.addr_exp2} = {part2}')
         time.sleep(2)
-        
+    ''' 
     print(exp.key_welding)
     print(exp)
-          
+    print (dacs)      
 

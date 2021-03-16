@@ -44,6 +44,7 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
         self.VD_ON_FIL = 21
         self.pins_vd = [self.VD_ON_UACC, self.VD_ON_WELD, self.VD_ON_FIL]
         
+        self._bouncetime = 300
         self.time_wait_iweld=5
 
     def __str__(self):
@@ -64,8 +65,8 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
         '''initial state of pins'''
 
         GPIO.setup(self.pins_knob, GPIO.IN, pull_up_down=GPIO.PUD_UP) # knobs
-        GPIO.setup(self.pins_rule, GPIO.IN, pull_up_down=GPIO.PUD_UP) #
-        GPIO.setup(self.pins_vd, GPIO.OUT, initial=GPIO.LOW) # OUT signal in 1
+        GPIO.setup(self.pins_rule, GPIO.IN, pull_up_down=GPIO.PUD_UP) # outside knobs
+        GPIO.setup(self.pins_vd, GPIO.OUT, initial=GPIO.LOW) # vd
     
 #!!!!!!!!!!!!!! run in cykle !!!!!!!!!!!!!!!!!!!
     def set_output_VD(self, stat_system:dict, value_ibomb, setted_ibomb): #
@@ -232,7 +233,8 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
             фронт из 0 в 1 – команда контроллеру на выключение тока сварки;
         '''
         GPIO.add_event_detect(self.ON_WELD, GPIO.BOTH, 
-                                callback=self.callback_ON_WELD, bouncetime=150)
+                                callback=self.callback_ON_WELD, 
+                                bouncetime=self._bouncetime)
         print('event ON_WELD runed')
 
         '''     Входной сигнал ON_UACC:
@@ -240,7 +242,8 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
             фронт из 0 в 1 – команда контроллеру на выключение тока бомбардировки, затем команда контроллеру на выключение источника ускоряющего напряжения;
         '''
         GPIO.add_event_detect(self.ON_UACC, GPIO.BOTH, 
-                                callback=self.callback_ON_UACC, bouncetime=150)
+                                callback=self.callback_ON_UACC,
+                                bouncetime=self._bouncetime)
         print('event ON_UACC runed')
 
     def run_system_on_knob(self): # btn = [self.KN_UACC, self.KN_I_BOMB]
@@ -254,7 +257,8 @@ class PinIO(ModbusConnect, ExtSwitcher, SettFOC):
 
         '''
         for knob in self.pins_knob:
-            GPIO.add_event_detect(knob, GPIO.FALLING, bouncetime=300,
+            GPIO.add_event_detect(knob, GPIO.FALLING,
+                                bouncetime=self._bouncetime,
                                 callback=self.callback_knob)
             print(f'event knob {knob} runed')
     
